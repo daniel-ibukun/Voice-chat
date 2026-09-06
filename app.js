@@ -1,5 +1,5 @@
 // ============================================================
-// VOICE CHAT APP - SECURE VERSION
+// VOICE CHAT APP
 // Firebase Authentication + Realtime Database + WebRTC
 // ============================================================
 
@@ -20,14 +20,12 @@ import {
     get,
     set,
     update,
-    remove,
     onValue,
     onChildAdded,
     onDisconnect,
     push,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
-
 
 // ============================================================
 // FIREBASE CONFIG
@@ -47,7 +45,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-
 // ============================================================
 // GLOBAL STATE
 // ============================================================
@@ -62,7 +59,6 @@ let remoteStream = null;
 let currentCallId = null;
 let currentCall = null;
 let currentOtherUser = null;
-
 let incomingCall = null;
 
 let usersUnsubscribe = null;
@@ -81,7 +77,6 @@ let callStartTime = null;
 let isMuted = false;
 let isSpeakerOn = true;
 
-
 // ============================================================
 // WEBRTC
 // ============================================================
@@ -97,7 +92,6 @@ const rtcConfiguration = {
     ]
 };
 
-
 // ============================================================
 // HELPERS
 // ============================================================
@@ -105,7 +99,6 @@ const rtcConfiguration = {
 function $(id) {
     return document.getElementById(id);
 }
-
 
 function escapeHTML(value) {
     return String(value ?? "")
@@ -116,7 +109,6 @@ function escapeHTML(value) {
         .replace(/'/g, "&#039;");
 }
 
-
 function avatarLetter(name) {
     const value = String(name || "U").trim();
 
@@ -124,7 +116,6 @@ function avatarLetter(name) {
         value.charAt(0).toUpperCase() || "U"
     );
 }
-
 
 function formatTime(timestamp) {
     if (!timestamp) return "";
@@ -141,7 +132,6 @@ function formatTime(timestamp) {
     });
 }
 
-
 function formatDuration(seconds) {
     seconds = Number(seconds || 0);
 
@@ -153,15 +143,12 @@ function formatDuration(seconds) {
     ).padStart(2, "0")}`;
 }
 
-
 function showNotification(message) {
     console.log("APP:", message);
 
     const notification = $("notification");
 
-    if (!notification) {
-        return;
-    }
+    if (!notification) return;
 
     notification.textContent = message;
     notification.classList.add("show");
@@ -173,7 +160,6 @@ function showNotification(message) {
     }, 4000);
 }
 
-
 function showAuthMessage(message, error = false) {
     const element = $("authMessage");
 
@@ -182,7 +168,6 @@ function showAuthMessage(message, error = false) {
     element.textContent = message;
     element.style.color = error ? "red" : "";
 }
-
 
 function showScreen(screen) {
     const authSection = $("authSection");
@@ -199,7 +184,6 @@ function showScreen(screen) {
     }
 }
 
-
 // ============================================================
 // REGISTER
 // ============================================================
@@ -214,18 +198,12 @@ async function registerUser(event) {
         $("registerConfirmPassword")?.value;
 
     if (!name) {
-        showAuthMessage(
-            "Please enter your name.",
-            true
-        );
+        showAuthMessage("Please enter your name.", true);
         return;
     }
 
     if (!email) {
-        showAuthMessage(
-            "Please enter your email.",
-            true
-        );
+        showAuthMessage("Please enter your email.", true);
         return;
     }
 
@@ -269,8 +247,8 @@ async function registerUser(event) {
 
         const profile = {
             uid: credential.user.uid,
-            name,
-            email,
+            name: name,
+            email: email,
             online: true,
             createdAt: Date.now(),
             lastSeen: Date.now()
@@ -292,13 +270,11 @@ async function registerUser(event) {
         );
 
     } catch (error) {
-        console.error(
-            "REGISTER ERROR:",
-            error
-        );
+        console.error("REGISTER ERROR:", error);
+        console.error("REGISTER CODE:", error?.code);
 
         showAuthMessage(
-            error.message ||
+            error?.message ||
                 "Could not create account.",
             true
         );
@@ -306,12 +282,10 @@ async function registerUser(event) {
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent =
-                "Create Account";
+            button.textContent = "Create Account";
         }
     }
 }
-
 
 // ============================================================
 // LOGIN
@@ -348,23 +322,15 @@ async function loginUser(event) {
             password
         );
 
-        showAuthMessage(
-            "Login successful."
-        );
+        showAuthMessage("Login successful.");
 
     } catch (error) {
-        console.error(
-            "LOGIN ERROR:",
-            error
-        );
-
-        console.error(
-            "ERROR CODE:",
-            error.code
-        );
+        console.error("LOGIN ERROR:", error);
+        console.error("ERROR CODE:", error?.code);
+        console.error("ERROR MESSAGE:", error?.message);
 
         showAuthMessage(
-            error.message ||
+            error?.message ||
                 "Could not log in.",
             true
         );
@@ -377,7 +343,6 @@ async function loginUser(event) {
     }
 }
 
-
 // ============================================================
 // LOGOUT
 // ============================================================
@@ -385,14 +350,10 @@ async function loginUser(event) {
 async function logoutUser() {
     try {
         await cleanupEverything();
-
         await signOut(auth);
 
     } catch (error) {
-        console.error(
-            "LOGOUT ERROR:",
-            error
-        );
+        console.error("LOGOUT ERROR:", error);
 
         showNotification(
             "Could not log out."
@@ -400,16 +361,13 @@ async function logoutUser() {
     }
 }
 
-
 // ============================================================
 // LOAD PROFILE
 // ============================================================
 
 async function loadMyProfile() {
     if (!currentUser) {
-        throw new Error(
-            "No authenticated user."
-        );
+        throw new Error("No authenticated user.");
     }
 
     const profileRef =
@@ -432,10 +390,10 @@ async function loadMyProfile() {
         uid: currentUser.uid,
         name:
             currentUser.displayName ||
+            currentUser.email?.split("@")[0] ||
             "User",
         email:
-            currentUser.email ||
-            "",
+            currentUser.email || "",
         online: true,
         createdAt: Date.now(),
         lastSeen: Date.now()
@@ -446,7 +404,6 @@ async function loadMyProfile() {
         currentProfile
     );
 }
-
 
 // ============================================================
 // PRESENCE
@@ -478,9 +435,8 @@ async function setupPresence() {
     });
 }
 
-
 // ============================================================
-// UPDATE UI
+// UPDATE MY UI
 // ============================================================
 
 function updateMyUI() {
@@ -505,7 +461,6 @@ function updateMyUI() {
     }
 }
 
-
 // ============================================================
 // USERS
 // ============================================================
@@ -513,6 +468,7 @@ function updateMyUI() {
 function listenForUsers() {
     if (usersUnsubscribe) {
         usersUnsubscribe();
+        usersUnsubscribe = null;
     }
 
     const usersRef =
@@ -547,12 +503,11 @@ function listenForUsers() {
                 );
 
                 showNotification(
-                    `Could not load users: ${error.message}`
+                    `Could not load users: ${error?.message || "Unknown error"}`
                 );
             }
         );
 }
-
 
 // ============================================================
 // RENDER USERS
@@ -615,7 +570,6 @@ function renderUsers(users) {
     });
 }
 
-
 // ============================================================
 // CREATE PEER CONNECTION
 // ============================================================
@@ -633,7 +587,6 @@ function createPeerConnection(role) {
     peerConnection.onicecandidate =
         async event => {
             if (!event.candidate) return;
-
             if (!currentCallId) return;
 
             const path =
@@ -665,26 +618,22 @@ function createPeerConnection(role) {
                     new MediaStream();
             }
 
-            for (const stream of event.streams) {
-                for (
-                    const track
-                    of stream.getTracks()
-                ) {
-                    if (
-                        !remoteStream
+            event.streams.forEach(stream => {
+                stream.getTracks().forEach(track => {
+                    const exists =
+                        remoteStream
                             .getTracks()
                             .some(
                                 existing =>
                                     existing.id ===
                                     track.id
-                            )
-                    ) {
-                        remoteStream.addTrack(
-                            track
-                        );
+                            );
+
+                    if (!exists) {
+                        remoteStream.addTrack(track);
                     }
-                }
-            }
+                });
+            });
 
             const audio =
                 $("remoteAudio");
@@ -696,7 +645,7 @@ function createPeerConnection(role) {
                 audio.play().catch(
                     error => {
                         console.log(
-                            "Audio play waiting for interaction:",
+                            "Audio play waiting for user interaction:",
                             error
                         );
                     }
@@ -717,9 +666,8 @@ function createPeerConnection(role) {
                 peerConnection.connectionState ===
                 "connected"
             ) {
-                setCallStatus(
-                    "Connected"
-                );
+                setCallStatus("Connected");
+                setOutgoingStatus("Connected");
             }
 
             if (
@@ -739,7 +687,6 @@ function createPeerConnection(role) {
     return peerConnection;
 }
 
-
 // ============================================================
 // MICROPHONE
 // ============================================================
@@ -750,21 +697,19 @@ async function getMicrophone() {
         !navigator.mediaDevices.getUserMedia
     ) {
         throw new Error(
-            "Microphone access is not supported."
+            "Microphone access is not supported by this browser."
         );
     }
 
     try {
-        return await navigator.mediaDevices.getUserMedia(
-            {
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
-                video: false
-            }
-        );
+        return await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: false
+        });
 
     } catch (error) {
         console.error(
@@ -793,7 +738,6 @@ async function getMicrophone() {
         throw error;
     }
 }
-
 
 // ============================================================
 // START CALL
@@ -891,7 +835,6 @@ async function startCall(user) {
             callData
         );
 
-        // Secure incoming-call notification
         await set(
             ref(
                 db,
@@ -906,8 +849,7 @@ async function startCall(user) {
                     "User",
 
                 callerEmail:
-                    currentUser.email ||
-                    "",
+                    currentUser.email || "",
 
                 calleeId:
                     user.uid,
@@ -919,6 +861,9 @@ async function startCall(user) {
                     serverTimestamp()
             }
         );
+
+        currentCall =
+            callData;
 
         showOutgoingCall(user);
 
@@ -941,30 +886,16 @@ async function startCall(user) {
             error
         );
 
-        console.error(
-            "ERROR CODE:",
-            error?.code
-        );
-
-        console.error(
-            "ERROR MESSAGE:",
-            error?.message
-        );
-
         showNotification(
-            `Could not start call: ${
-                error.message ||
-                "Unknown error"
-            }`
+            `Could not start call: ${error?.message || "Unknown error"}`
         );
 
         await cleanupCallAfterFailure();
     }
 }
 
-
 // ============================================================
-// LISTEN FOR CALL UPDATES
+// CALL UPDATES
 // ============================================================
 
 function listenForCallUpdates() {
@@ -972,6 +903,7 @@ function listenForCallUpdates() {
 
     if (callUnsubscribe) {
         callUnsubscribe();
+        callUnsubscribe = null;
     }
 
     const callRef =
@@ -989,7 +921,8 @@ function listenForCallUpdates() {
 
                 if (!call) return;
 
-                currentCall = call;
+                currentCall =
+                    call;
 
                 if (
                     call.answer &&
@@ -1043,10 +976,6 @@ function listenForCallUpdates() {
                     call.status ===
                     "cancelled"
                 ) {
-                    showNotification(
-                        "Call cancelled."
-                    );
-
                     await finishCall(
                         "cancelled"
                     );
@@ -1070,23 +999,23 @@ function listenForCallUpdates() {
         );
 }
 
-
 // ============================================================
-// LISTEN FOR CALLEE ICE
+// CALLEE ICE
 // ============================================================
 
 function listenForCalleeCandidates() {
     if (!currentCallId) return;
+
+    if (calleeCandidatesUnsubscribe) {
+        calleeCandidatesUnsubscribe();
+        calleeCandidatesUnsubscribe = null;
+    }
 
     const candidatesRef =
         ref(
             db,
             `calls/${currentCallId}/calleeCandidates`
         );
-
-    if (calleeCandidatesUnsubscribe) {
-        calleeCandidatesUnsubscribe();
-    }
 
     calleeCandidatesUnsubscribe =
         onChildAdded(
@@ -1099,23 +1028,23 @@ function listenForCalleeCandidates() {
         );
 }
 
-
 // ============================================================
-// LISTEN FOR CALLER ICE
+// CALLER ICE
 // ============================================================
 
 function listenForCallerCandidates() {
     if (!currentCallId) return;
+
+    if (callerCandidatesUnsubscribe) {
+        callerCandidatesUnsubscribe();
+        callerCandidatesUnsubscribe = null;
+    }
 
     const candidatesRef =
         ref(
             db,
             `calls/${currentCallId}/callerCandidates`
         );
-
-    if (callerCandidatesUnsubscribe) {
-        callerCandidatesUnsubscribe();
-    }
 
     callerCandidatesUnsubscribe =
         onChildAdded(
@@ -1128,14 +1057,11 @@ function listenForCallerCandidates() {
         );
 }
 
-
 // ============================================================
 // REMOTE ICE
 // ============================================================
 
-async function addRemoteCandidate(
-    candidate
-) {
+async function addRemoteCandidate(candidate) {
     if (!candidate) return;
 
     if (
@@ -1161,7 +1087,6 @@ async function addRemoteCandidate(
         );
     }
 }
-
 
 async function flushPendingCandidates() {
     if (
@@ -1193,9 +1118,8 @@ async function flushPendingCandidates() {
     }
 }
 
-
 // ============================================================
-// INCOMING CALL LISTENER
+// INCOMING CALLS
 // ============================================================
 
 function listenForIncomingCalls() {
@@ -1203,6 +1127,7 @@ function listenForIncomingCalls() {
 
     if (incomingCallsUnsubscribe) {
         incomingCallsUnsubscribe();
+        incomingCallsUnsubscribe = null;
     }
 
     const incomingRef =
@@ -1253,6 +1178,11 @@ function listenForIncomingCalls() {
                 );
 
                 playRingtone();
+
+                sendBrowserNotification(
+                    "Incoming call",
+                    `${call.callerName || "Someone"} is calling you`
+                );
             },
             error => {
                 console.error(
@@ -1261,12 +1191,11 @@ function listenForIncomingCalls() {
                 );
 
                 showNotification(
-                    `Could not listen for calls: ${error.message}`
+                    `Could not listen for calls: ${error?.message || "Unknown error"}`
                 );
             }
         );
 }
-
 
 // ============================================================
 // SHOW INCOMING CALL
@@ -1307,7 +1236,6 @@ function showIncomingCall(call) {
         overlay.style.display = "";
     }
 }
-
 
 // ============================================================
 // ACCEPT CALL
@@ -1366,6 +1294,17 @@ async function acceptCall() {
         currentCall =
             callData;
 
+        currentOtherUser = {
+            uid:
+                callData.callerId,
+
+            name:
+                callData.callerName,
+
+            email:
+                callData.callerEmail
+        };
+
         await peerConnection.setRemoteDescription(
             new RTCSessionDescription(
                 callData.offer
@@ -1413,7 +1352,7 @@ async function acceptCall() {
         showActiveCall();
 
         setCallStatus(
-            "Connected"
+            "Connecting..."
         );
 
         console.log(
@@ -1428,10 +1367,7 @@ async function acceptCall() {
         );
 
         showNotification(
-            `Could not accept call: ${
-                error.message ||
-                "Unknown error"
-            }`
+            `Could not accept call: ${error?.message || "Unknown error"}`
         );
 
         await finishCall(
@@ -1439,7 +1375,6 @@ async function acceptCall() {
         );
     }
 }
-
 
 // ============================================================
 // REJECT CALL
@@ -1453,11 +1388,14 @@ async function rejectCall() {
         return;
     }
 
+    const callId =
+        currentCallId;
+
     try {
         await update(
             ref(
                 db,
-                `calls/${currentCallId}`
+                `calls/${callId}`
             ),
             {
                 status:
@@ -1471,7 +1409,7 @@ async function rejectCall() {
         await update(
             ref(
                 db,
-                `incomingCalls/${currentUser.uid}/${currentCallId}`
+                `incomingCalls/${currentUser.uid}/${callId}`
             ),
             {
                 status:
@@ -1494,7 +1432,6 @@ async function rejectCall() {
     incomingCall = null;
 }
 
-
 // ============================================================
 // CANCEL OUTGOING CALL
 // ============================================================
@@ -1502,11 +1439,14 @@ async function rejectCall() {
 async function cancelOutgoingCall() {
     if (!currentCallId) return;
 
+    const callId =
+        currentCallId;
+
     try {
         await update(
             ref(
                 db,
-                `calls/${currentCallId}`
+                `calls/${callId}`
             ),
             {
                 status:
@@ -1521,7 +1461,7 @@ async function cancelOutgoingCall() {
             await update(
                 ref(
                     db,
-                    `incomingCalls/${currentOtherUser.uid}/${currentCallId}`
+                    `incomingCalls/${currentOtherUser.uid}/${callId}`
                 ),
                 {
                     status:
@@ -1542,9 +1482,8 @@ async function cancelOutgoingCall() {
     );
 }
 
-
 // ============================================================
-// END CALL BUTTON
+// END CALL
 // ============================================================
 
 async function endCurrentCall() {
@@ -1553,14 +1492,11 @@ async function endCurrentCall() {
     );
 }
 
-
 // ============================================================
 // FINISH CALL
 // ============================================================
 
-async function finishCall(
-    status
-) {
+async function finishCall(status) {
     const callId =
         currentCallId;
 
@@ -1593,23 +1529,22 @@ async function finishCall(
             await update(
                 callRef,
                 {
-                    status,
-                    duration,
+                    status:
+                        status,
+
+                    duration:
+                        duration,
+
                     endedAt:
                         serverTimestamp()
                 }
             );
 
-            if (
-                currentUser &&
-                currentOtherUser
-            ) {
-                await saveCallHistory(
-                    call,
-                    status,
-                    duration
-                );
-            }
+            await saveCallHistory(
+                call,
+                status,
+                duration
+            );
 
             if (
                 currentOtherUser?.uid
@@ -1620,7 +1555,8 @@ async function finishCall(
                         `incomingCalls/${currentOtherUser.uid}/${callId}`
                     ),
                     {
-                        status
+                        status:
+                            status
                     }
                 ).catch(
                     () => {}
@@ -1636,7 +1572,8 @@ async function finishCall(
                         `incomingCalls/${currentUser.uid}/${callId}`
                     ),
                     {
-                        status
+                        status:
+                            status
                     }
                 ).catch(
                     () => {}
@@ -1661,7 +1598,6 @@ async function finishCall(
     incomingCall = null;
 }
 
-
 // ============================================================
 // FAILURE CLEANUP
 // ============================================================
@@ -1685,8 +1621,10 @@ async function cleanupCallAfterFailure() {
                 () => {}
             );
         }
+
     } catch (error) {
         console.error(
+            "FAILURE CLEANUP ERROR:",
             error
         );
     }
@@ -1700,7 +1638,6 @@ async function cleanupCallAfterFailure() {
     currentOtherUser = null;
     incomingCall = null;
 }
-
 
 // ============================================================
 // CLEAN WEBRTC
@@ -1764,8 +1701,23 @@ function cleanupWebRTC() {
 
     isMuted = false;
     isSpeakerOn = true;
-}
 
+    const muteButton =
+        $("muteBtn");
+
+    if (muteButton) {
+        muteButton.textContent =
+            "Mute";
+    }
+
+    const speakerButton =
+        $("speakerBtn");
+
+    if (speakerButton) {
+        speakerButton.textContent =
+            "Speaker";
+    }
+}
 
 // ============================================================
 // CALL UI
@@ -1804,7 +1756,6 @@ function showOutgoingCall(user) {
     }
 }
 
-
 function hideOutgoingCall() {
     const overlay =
         $("outgoingCallOverlay");
@@ -1814,7 +1765,6 @@ function hideOutgoingCall() {
             "none";
     }
 }
-
 
 function showActiveCall() {
     hideIncomingCall();
@@ -1853,7 +1803,6 @@ function showActiveCall() {
     startCallTimer();
 }
 
-
 function hideActiveCall() {
     const overlay =
         $("callOverlay");
@@ -1863,7 +1812,6 @@ function hideActiveCall() {
             "none";
     }
 }
-
 
 function hideIncomingCall() {
     const overlay =
@@ -1875,13 +1823,11 @@ function hideIncomingCall() {
     }
 }
 
-
 function hideAllCallOverlays() {
     hideIncomingCall();
     hideOutgoingCall();
     hideActiveCall();
 }
-
 
 function setCallStatus(status) {
     const element =
@@ -1893,7 +1839,6 @@ function setCallStatus(status) {
     }
 }
 
-
 function setOutgoingStatus(status) {
     const element =
         $("outgoingCallStatus");
@@ -1903,7 +1848,6 @@ function setOutgoingStatus(status) {
             status;
     }
 }
-
 
 // ============================================================
 // TIMER
@@ -1947,7 +1891,6 @@ function startCallTimer() {
         }, 1000);
 }
 
-
 function stopCallTimer() {
     if (callTimerInterval) {
         clearInterval(
@@ -1958,9 +1901,9 @@ function stopCallTimer() {
             null;
     }
 
-    callStartTime = null;
+    callStartTime =
+        null;
 }
-
 
 // ============================================================
 // MUTE
@@ -1974,7 +1917,8 @@ function toggleMute() {
 
     if (!tracks.length) return;
 
-    isMuted = !isMuted;
+    isMuted =
+        !isMuted;
 
     tracks.forEach(track => {
         track.enabled =
@@ -1991,7 +1935,6 @@ function toggleMute() {
                 : "Mute";
     }
 }
-
 
 // ============================================================
 // SPEAKER
@@ -2020,7 +1963,6 @@ function toggleSpeaker() {
     }
 }
 
-
 // ============================================================
 // RINGTONE
 // ============================================================
@@ -2043,7 +1985,6 @@ function playRingtone() {
     );
 }
 
-
 function stopRingtone() {
     const ringtone =
         $("ringtone");
@@ -2053,7 +1994,6 @@ function stopRingtone() {
     ringtone.pause();
     ringtone.currentTime = 0;
 }
-
 
 // ============================================================
 // CALL HISTORY
@@ -2069,22 +2009,31 @@ async function saveCallHistory(
     const historyData = {
         callId:
             currentCallId || "",
+
         callerId:
             call.callerId || "",
+
         callerName:
             call.callerName || "",
+
         callerEmail:
             call.callerEmail || "",
+
         calleeId:
             call.calleeId || "",
+
         calleeName:
             call.calleeName || "",
+
         calleeEmail:
             call.calleeEmail || "",
+
         status:
             status || "ended",
+
         duration:
             Number(duration || 0),
+
         timestamp:
             Date.now()
     };
@@ -2126,7 +2075,6 @@ async function saveCallHistory(
     }
 }
 
-
 // ============================================================
 // HISTORY LISTENER
 // ============================================================
@@ -2136,6 +2084,7 @@ function listenForCallHistory() {
 
     if (historyUnsubscribe) {
         historyUnsubscribe();
+        historyUnsubscribe = null;
     }
 
     const historyRef =
@@ -2155,13 +2104,11 @@ function listenForCallHistory() {
                         child.val();
 
                     if (data) {
-                        history.push(
-                            {
-                                id:
-                                    child.key,
-                                ...data
-                            }
-                        );
+                        history.push({
+                            id:
+                                child.key,
+                            ...data
+                        });
                     }
                 });
 
@@ -2187,7 +2134,6 @@ function listenForCallHistory() {
             }
         );
 }
-
 
 // ============================================================
 // RENDER HISTORY
@@ -2252,7 +2198,6 @@ function renderCallHistory(history) {
     });
 }
 
-
 // ============================================================
 // BROWSER NOTIFICATIONS
 // ============================================================
@@ -2278,7 +2223,6 @@ async function setupBrowserNotifications() {
         }
     }
 }
-
 
 function sendBrowserNotification(
     title,
@@ -2311,7 +2255,6 @@ function sendBrowserNotification(
         );
     }
 }
-
 
 // ============================================================
 // CLEANUP EVERYTHING
@@ -2347,13 +2290,11 @@ async function cleanupEverything() {
     incomingCall = null;
 }
 
-
 // ============================================================
 // BUTTON EVENTS
 // ============================================================
 
 function setupEvents() {
-
     $("loginForm")?.addEventListener(
         "submit",
         loginUser
@@ -2434,7 +2375,6 @@ function setupEvents() {
     );
 }
 
-
 // ============================================================
 // AUTH STATE
 // ============================================================
@@ -2442,7 +2382,6 @@ function setupEvents() {
 onAuthStateChanged(
     auth,
     async user => {
-
         if (!user) {
             currentUser = null;
             currentProfile = null;
@@ -2493,7 +2432,6 @@ onAuthStateChanged(
             setupBrowserNotifications();
 
         } catch (error) {
-
             console.error(
                 "AUTH SETUP ERROR:",
                 error
@@ -2509,8 +2447,12 @@ onAuthStateChanged(
                 error?.message
             );
 
+            showScreen("main");
+
+            updateMyUI();
+
             showNotification(
-                `Account error: ${
+                `Account setup error: ${
                     error?.message ||
                     "Unknown error"
                 }`
@@ -2518,7 +2460,6 @@ onAuthStateChanged(
         }
     }
 );
-
 
 // ============================================================
 // START
