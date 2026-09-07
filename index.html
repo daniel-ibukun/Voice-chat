@@ -2,190 +2,774 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voice Chat App</title>
-  <link rel="stylesheet" href="style.css">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="VOICE CHAT - Make voice calls with other users."
+  >
+
+  <title>VOICE CHAT</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f5f9;
+      color: #172033;
+      min-height: 100vh;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ==============================
+       AUTH
+    ============================== */
+
+    #authSection {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .logo h1 {
+      font-size: 32px;
+      color: #2563eb;
+    }
+
+    .logo p {
+      margin-top: 7px;
+      color: #667085;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 7px;
+      font-weight: bold;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #d0d5dd;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: #2563eb;
+    }
+
+    .primary-btn {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+    }
+
+    .primary-btn:hover {
+      background: #1d4ed8;
+    }
+
+    .secondary-btn {
+      width: 100%;
+      margin-top: 10px;
+      border: 1px solid #d0d5dd;
+      border-radius: 10px;
+      padding: 13px;
+      background: white;
+      color: #344054;
+    }
+
+    .message {
+      margin-top: 15px;
+      text-align: center;
+      color: #d92d20;
+    }
+
+    /* ==============================
+       MAIN APP
+    ============================== */
+
+    #mainSection {
+      min-height: 100vh;
+    }
+
+    .topbar {
+      background: white;
+      padding: 15px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .topbar h1 {
+      color: #2563eb;
+      font-size: 24px;
+    }
+
+    .profile-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .profile-area img {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+    }
+
+    .logout-btn {
+      border: none;
+      background: #fee4e2;
+      color: #b42318;
+      padding: 9px 13px;
+      border-radius: 8px;
+    }
+
+    .content {
+      max-width: 900px;
+      margin: auto;
+      padding: 25px;
+    }
+
+    .welcome-card {
+      background: white;
+      padding: 22px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .welcome-card h2 {
+      margin-bottom: 5px;
+    }
+
+    /* ==============================
+       USERS
+    ============================== */
+
+    .section-card {
+      background: white;
+      border-radius: 16px;
+      padding: 22px;
+      margin-bottom: 20px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .section-card h2 {
+      margin-bottom: 15px;
+    }
+
+    .user-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      padding: 14px 0;
+      border-bottom: 1px solid #eaecf0;
+    }
+
+    .user-item:last-child {
+      border-bottom: none;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .user-info img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .user-name {
+      font-weight: bold;
+    }
+
+    .user-email {
+      color: #667085;
+      font-size: 13px;
+      margin-top: 3px;
+      word-break: break-word;
+    }
+
+    .call-buttons {
+      display: flex;
+      gap: 7px;
+    }
+
+    .call-btn {
+      border: none;
+      border-radius: 9px;
+      padding: 9px 12px;
+      color: white;
+      background: #16a34a;
+    }
+
+    .call-btn:hover {
+      background: #15803d;
+    }
+
+    /* ==============================
+       CALL HISTORY
+    ============================== */
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 0;
+      border-bottom: 1px solid #eaecf0;
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-avatar img {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+    }
+
+    .history-info {
+      flex: 1;
+    }
+
+    .history-info strong {
+      display: block;
+    }
+
+    .history-info span {
+      display: block;
+      margin-top: 3px;
+      color: #667085;
+      font-size: 13px;
+    }
+
+    .history-date {
+      color: #667085;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    /* ==============================
+       CALL OVERLAYS
+    ============================== */
+
+    .call-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 20, 40, 0.88);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .call-box {
+      width: 100%;
+      max-width: 400px;
+      background: white;
+      border-radius: 25px;
+      padding: 35px 25px;
+      text-align: center;
+      box-shadow: 0 20px 70px rgba(0, 0, 0, 0.3);
+    }
+
+    .call-box img {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      margin-bottom: 18px;
+    }
+
+    .call-box h2 {
+      margin-bottom: 7px;
+    }
+
+    .call-box p {
+      color: #667085;
+    }
+
+    .ringing {
+      margin: 20px 0;
+      color: #2563eb;
+      font-weight: bold;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.35;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .call-actions {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 25px;
+    }
+
+    .accept-btn,
+    .reject-btn,
+    .cancel-btn,
+    .end-btn {
+      border: none;
+      color: white;
+      border-radius: 50%;
+      width: 65px;
+      height: 65px;
+      font-size: 25px;
+    }
+
+    .accept-btn {
+      background: #16a34a;
+    }
+
+    .reject-btn,
+    .end-btn,
+    .cancel-btn {
+      background: #dc2626;
+    }
+
+    /* ==============================
+       ACTIVE CALL
+    ============================== */
+
+    #callOverlay .call-box {
+      background: #101828;
+      color: white;
+    }
+
+    #callOverlay .call-box p {
+      color: #98a2b3;
+    }
+
+    #callAvatar {
+      width: 130px;
+      height: 130px;
+    }
+
+    #callStatus {
+      margin-top: 8px;
+    }
+
+    #callTimer {
+      font-size: 28px;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    .active-call-controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .control-btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 17px;
+      background: #344054;
+      color: white;
+    }
+
+    .control-btn.active {
+      background: #2563eb;
+    }
+
+    .control-btn.end {
+      background: #dc2626;
+    }
+
+    /* ==============================
+       NOTIFICATION
+    ============================== */
+
+    #notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      max-width: 350px;
+      background: #101828;
+      color: white;
+      padding: 15px 18px;
+      border-radius: 10px;
+      z-index: 500;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    /* ==============================
+       MOBILE
+    ============================== */
+
+    @media (max-width: 600px) {
+      .topbar {
+        padding: 12px 15px;
+      }
+
+      .topbar h1 {
+        font-size: 19px;
+      }
+
+      .content {
+        padding: 15px;
+      }
+
+      .user-item {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .call-buttons {
+        width: 100%;
+      }
+
+      .call-btn {
+        flex: 1;
+      }
+
+      .history-date {
+        display: none;
+      }
+    }
+  </style>
 </head>
 
 <body>
 
-  <!-- =========================
-       AUTHENTICATION
-  ========================== -->
+  <!-- ==========================================
+       AUTH SECTION
+  =========================================== -->
+
   <section id="authSection">
 
     <div class="auth-card">
 
-      <h1>Voice Chat</h1>
-      <p class="subtitle">Connect and talk with your friends</p>
+      <div class="logo">
+        <h1>📞 VOICE CHAT</h1>
+        <p>Connect with your friends</p>
+      </div>
+
 
       <!-- LOGIN -->
-      <div id="loginForm">
 
-        <h2>Login</h2>
+      <form id="loginForm">
 
-        <input
-          type="email"
-          id="loginEmail"
-          placeholder="Email"
-          autocomplete="email"
+        <div class="form-group">
+          <label for="loginEmail">
+            Email
+          </label>
+
+          <input
+            type="email"
+            id="loginEmail"
+            placeholder="Enter your email"
+            required
+          >
+        </div>
+
+
+        <div class="form-group">
+          <label for="loginPassword">
+            Password
+          </label>
+
+          <input
+            type="password"
+            id="loginPassword"
+            placeholder="Enter your password"
+            required
+          >
+        </div>
+
+
+        <button
+          type="submit"
+          id="loginBtn"
+          class="primary-btn"
         >
-
-        <input
-          type="password"
-          id="loginPassword"
-          placeholder="Password"
-          autocomplete="current-password"
-        >
-
-        <button type="button" id="loginBtn">
           Login
         </button>
 
-        <p id="authMessage"></p>
+      </form>
 
-        <p>
-          Don't have an account?
-          <button type="button" id="showRegisterBtn">
-            Create Account
-          </button>
-        </p>
 
-      </div>
+      <button
+        id="showRegisterBtn"
+        class="secondary-btn"
+        type="button"
+      >
+        Create an account
+      </button>
+
+
+      <div
+        id="authMessage"
+        class="message"
+      ></div>
 
 
       <!-- REGISTER -->
-      <div id="registerForm" class="hidden">
 
-        <h2>Create Account</h2>
+      <form
+        id="registerForm"
+        class="hidden"
+      >
 
-        <input
-          type="text"
-          id="registerName"
-          placeholder="Your name"
-          autocomplete="name"
+        <div class="form-group">
+          <label for="registerName">
+            Your Name
+          </label>
+
+          <input
+            type="text"
+            id="registerName"
+            placeholder="Enter your name"
+            required
+          >
+        </div>
+
+
+        <div class="form-group">
+          <label for="registerEmail">
+            Email
+          </label>
+
+          <input
+            type="email"
+            id="registerEmail"
+            placeholder="Enter your email"
+            required
+          >
+        </div>
+
+
+        <div class="form-group">
+          <label for="registerPassword">
+            Password
+          </label>
+
+          <input
+            type="password"
+            id="registerPassword"
+            placeholder="Create a password"
+            minlength="6"
+            required
+          >
+        </div>
+
+
+        <div class="form-group">
+          <label for="registerConfirmPassword">
+            Confirm Password
+          </label>
+
+          <input
+            type="password"
+            id="registerConfirmPassword"
+            placeholder="Confirm your password"
+            minlength="6"
+            required
+          >
+        </div>
+
+
+        <button
+          type="submit"
+          id="registerBtn"
+          class="primary-btn"
         >
-
-        <input
-          type="email"
-          id="registerEmail"
-          placeholder="Email"
-          autocomplete="email"
-        >
-
-        <input
-          type="password"
-          id="registerPassword"
-          placeholder="Password"
-          autocomplete="new-password"
-        >
-
-        <input
-          type="password"
-          id="registerConfirmPassword"
-          placeholder="Confirm password"
-          autocomplete="new-password"
-        >
-
-        <button type="button" id="registerBtn">
-          Create Account
+          Register
         </button>
 
-        <p id="registerMessage"></p>
+      </form>
 
-        <p>
-          Already have an account?
-          <button type="button" id="showLoginBtn">
-            Login
-          </button>
-        </p>
 
-      </div>
+      <button
+        id="showLoginBtn"
+        class="secondary-btn hidden"
+        type="button"
+      >
+        Already have an account? Login
+      </button>
+
+
+      <div
+        id="registerMessage"
+        class="message"
+      ></div>
 
     </div>
 
   </section>
 
 
-  <!-- =========================
+  <!-- ==========================================
        MAIN APP
-  ========================== -->
-  <section id="mainSection" class="hidden">
+  =========================================== -->
 
-    <header class="header">
+  <section
+    id="mainSection"
+    class="hidden"
+  >
 
-      <div>
-        <h1>Voice Chat</h1>
-        <p id="welcomeText">Welcome</p>
-      </div>
+    <header class="topbar">
 
-      <div class="header-user">
+      <h1>📞 VOICE CHAT</h1>
+
+      <div class="profile-area">
+
         <img
           id="myAvatar"
-          class="avatar"
           src=""
-          alt="My avatar"
+          alt="My profile"
         >
 
-        <button type="button" id="logoutBtn">
+        <span id="welcomeText">
+          Welcome
+        </span>
+
+        <button
+          id="logoutBtn"
+          class="logout-btn"
+          type="button"
+        >
           Logout
         </button>
+
       </div>
 
     </header>
 
 
-    <main>
+    <main class="content">
 
-      <!-- USERS -->
-      <section>
+      <!-- WELCOME -->
 
-        <h2 class="section-title">
-          People
+      <div class="welcome-card">
+
+        <h2>
+          Welcome to Voice Chat 👋
         </h2>
 
-        <div id="usersList" class="users-list">
-          <p class="loading">
-            Loading users...
-          </p>
+        <p>
+          Select a user below to make a voice call.
+        </p>
+
+      </div>
+
+
+      <!-- USERS -->
+
+      <div class="section-card">
+
+        <h2>👥 Users</h2>
+
+        <div id="usersList">
+          Loading users...
         </div>
 
-      </section>
+      </div>
 
 
       <!-- CALL HISTORY -->
-      <section>
 
-        <h2 class="section-title">
-          Call History
-        </h2>
+      <div class="section-card">
 
-        <div id="callHistory">
-          <p class="loading">
-            No call history yet.
-          </p>
+        <h2>📋 Call History</h2>
+
+        <div id="callHistoryList">
+          Loading call history...
         </div>
 
-      </section>
+      </div>
 
     </main>
 
   </section>
 
 
-  <!-- =========================
+  <!-- ==========================================
        INCOMING CALL
-  ========================== -->
+  =========================================== -->
+
   <div
     id="incomingCallOverlay"
     class="call-overlay hidden"
   >
 
-    <div class="call-card incoming-call-card">
+    <div class="call-box">
 
       <img
         id="incomingCallerAvatar"
-        class="large-avatar"
         src=""
         alt="Caller"
       >
@@ -194,28 +778,32 @@
         Incoming Call
       </h2>
 
-      <p id="incomingCallerEmail"></p>
-
-      <div id="ringingIndicator" class="ringing-indicator">
-        📞 Incoming call...
+      <div
+        id="ringingIndicator"
+        class="ringing"
+      >
+        📞 Incoming voice call...
       </div>
 
-      <div class="incoming-buttons">
+
+      <div class="call-actions">
 
         <button
-          type="button"
           id="rejectCallBtn"
-          class="call-control reject-btn"
+          class="reject-btn"
+          type="button"
+          title="Reject call"
         >
-          Reject
+          ❌
         </button>
 
         <button
-          type="button"
           id="acceptCallBtn"
-          class="call-control accept-btn"
+          class="accept-btn"
+          type="button"
+          title="Accept call"
         >
-          Accept
+          📞
         </button>
 
       </div>
@@ -225,109 +813,118 @@
   </div>
 
 
-  <!-- =========================
+  <!-- ==========================================
        OUTGOING CALL
-  ========================== -->
+  =========================================== -->
+
   <div
     id="outgoingCallOverlay"
     class="call-overlay hidden"
   >
 
-    <div class="call-card">
+    <div class="call-box">
 
       <img
         id="outgoingCallerAvatar"
-        class="large-avatar"
         src=""
-        alt="Calling"
+        alt="User"
       >
 
       <h2 id="outgoingCallerName">
         Calling...
       </h2>
 
-      <p id="outgoingCallStatus">
+      <div
+        id="outgoingCallStatus"
+        class="ringing"
+      >
         Calling...
-      </p>
+      </div>
 
-      <div id="outgoingRinging" class="ringing-indicator">
+      <div
+        id="outgoingRinging"
+        class="ringing"
+      >
         📞 Ringing...
       </div>
 
-      <button
-        type="button"
-        id="cancelCallBtn"
-        class="call-control reject-btn"
-      >
-        Cancel
-      </button>
+
+      <div class="call-actions">
+
+        <button
+          id="cancelCallBtn"
+          class="cancel-btn"
+          type="button"
+          title="Cancel call"
+        >
+          ❌
+        </button>
+
+      </div>
 
     </div>
 
   </div>
 
 
-  <!-- =========================
+  <!-- ==========================================
        ACTIVE CALL
-  ========================== -->
+  =========================================== -->
+
   <div
     id="callOverlay"
     class="call-overlay hidden"
   >
 
-    <div class="call-card">
+    <div class="call-box">
 
       <img
         id="callAvatar"
-        class="large-avatar"
         src=""
-        alt="Call"
+        alt="User"
       >
-
-      <p id="callType">
-        Voice Call
-      </p>
 
       <h2 id="callName">
         User
       </h2>
 
-      <p id="callStatus">
-        Connected
+      <p id="callType">
+        Voice Call
       </p>
 
-      <div
-        id="callTimer"
-        class="call-timer"
-      >
+      <p id="callStatus">
+        Connecting...
+      </p>
+
+      <div id="callTimer">
         00:00
       </div>
 
 
-      <div class="call-controls">
+      <div class="active-call-controls">
 
         <button
-          type="button"
           id="muteBtn"
-          class="call-control"
+          class="control-btn"
+          type="button"
         >
           🎤 Mute
         </button>
 
         <button
-          type="button"
           id="speakerBtn"
-          class="call-control"
+          class="control-btn"
+          type="button"
         >
-          🔊 Speaker
+          🎧 Earpiece
         </button>
 
         <button
-          type="button"
           id="endCallBtn"
-          class="call-control end-call"
+          class="control-btn end"
+          type="button"
         >
-          ☎ End
+          ☎️ End
         </button>
 
       </div>
@@ -337,35 +934,47 @@
   </div>
 
 
-  <!-- =========================
+  <!-- ==========================================
+       NOTIFICATION
+  =========================================== -->
+
+  <div
+    id="notification"
+    class="hidden"
+  ></div>
+
+
+  <!-- ==========================================
        AUDIO
-  ========================== -->
+  =========================================== -->
+
   <audio
     id="remoteAudio"
     autoplay
     playsinline
   ></audio>
 
+
   <audio
     id="ringtone"
     loop
     preload="auto"
-  ></audio>
+  >
+    <source
+      src="ringtone.mp3"
+      type="audio/mpeg"
+    >
+  </audio>
 
 
-  <!-- =========================
-       NOTIFICATION
-  ========================== -->
-  <div
-    id="notification"
-    class="notification hidden"
-  ></div>
+  <!-- ==========================================
+       APP JAVASCRIPT
+  =========================================== -->
 
-
-  <!-- =========================
-       JAVASCRIPT
-  ========================== -->
-  <script type="module" src="app.js"></script>
+  <script
+    type="module"
+    src="app.js"
+  ></script>
 
 </body>
 </html>
