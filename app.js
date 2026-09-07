@@ -1,11 +1,14 @@
 // ============================================================
 // VOICE CHAT APP - COMPLETE APP.JS
-// Firebase Auth + Realtime Database + WebRTC
+// Firebase Auth + Realtime Database + WebRTC + FCM
 // ============================================================
 
-import {
-  initializeApp
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+// ============================================================
+// FIREBASE IMPORTS
+// ============================================================
+
+import { initializeApp } from
+  "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 
 import {
   getAuth,
@@ -14,7 +17,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+} from
+  "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 import {
   getDatabase,
@@ -26,7 +30,15 @@ import {
   onValue,
   onChildAdded,
   onDisconnect
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
+} from
+  "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
+
+import {
+  getMessaging,
+  getToken,
+  onMessage
+} from
+  "https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging.js";
 
 
 // ============================================================
@@ -49,11 +61,38 @@ const firebaseConfig = {
 // ============================================================
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
-const messaging = getMessaging(app);
 
-const VAPID_KEY = "BFhU6C-xoaa9VLZopXwHVADPWqSWxlKaYkCvvK3HaQ0RIImUVFKg5aYpIq2L5Odmd73Cf895Se1zdT9PPmQz-cE";
+const auth = getAuth(app);
+
+const db = getDatabase(app);
+
+let messaging = null;
+
+try {
+  if (
+    "serviceWorker" in navigator &&
+    "Notification" in window
+  ) {
+    messaging = getMessaging(app);
+  }
+} catch (error) {
+  console.warn(
+    "Firebase Messaging could not initialize:",
+    error
+  );
+}
+
+
+// ============================================================
+// FCM / VAPID
+// ============================================================
+
+// Paste the VAPID public key you already generated.
+const VAPID_KEY =  "BFhU6C-xoaa9VLZopXwHVADPWqSWxlKaYkCvvK3HaQ0RIImUVFKg5aYpIq2L5Odmd73Cf895Se1zdT9PPmQz-cE";
+
+
+let messagingServiceWorkerRegistration = null;
+
 
 // ============================================================
 // GLOBAL STATE
@@ -85,8 +124,6 @@ let incomingCallsUnsubscribe = null;
 let historyUnsubscribe = null;
 
 let callUnsubscribers = [];
-
-let notificationPermissionAsked = false;
 
 
 // ============================================================
@@ -122,9 +159,10 @@ function $(id) {
 // ============================================================
 
 function makeAvatar(name) {
-  const safeName = encodeURIComponent(
-    String(name || "User").trim() || "User"
-  );
+  const safeName =
+    encodeURIComponent(
+      String(name || "User").trim() || "User"
+    );
 
   return (
     `https://ui-avatars.com/api/?name=${safeName}` +
@@ -134,7 +172,7 @@ function makeAvatar(name) {
 
 
 // ============================================================
-// NOTIFICATION
+// APP NOTIFICATION
 // ============================================================
 
 function showNotification(message) {
@@ -146,42 +184,21 @@ function showNotification(message) {
   }
 
   notification.textContent = message;
+
   notification.classList.remove("hidden");
 
   clearTimeout(notification._timeout);
 
-  notification._timeout = setTimeout(() => {
-    notification.classList.add("hidden");
-  }, 4000);
+  notification._timeout =
+    setTimeout(() => {
+      notification.classList.add("hidden");
+    }, 4000);
 }
 
 
 // ============================================================
-// BROWSER NOTIFICATION PERMISSION
+// BROWSER NOTIFICATION
 // ============================================================
-
-async function requestNotificationPermission() {
-  if (
-    notificationPermissionAsked ||
-    !("Notification" in window)
-  ) {
-    return;
-  }
-
-  notificationPermissionAsked = true;
-
-  try {
-    if (Notification.permission === "default") {
-      await Notification.requestPermission();
-    }
-  } catch (error) {
-    console.warn(
-      "Notification permission error:",
-      error
-    );
-  }
-}
-
 
 function sendBrowserNotification(title, body) {
   if (
@@ -206,17 +223,189 @@ function sendBrowserNotification(title, body) {
 
 
 // ============================================================
+// REGISTER FCM TOKEN
+// ============================================================
+
+async function registerFCMToken() {
+  if (
+    !currentUser ||
+    !messaging ||
+    !("serviceWorker" in navigator) ||
+    !("Notification" in window)
+  ) {
+    return;
+  }
+
+  try {
+    if (!VAPID_KEY ||
+        VAPID_KEY ===
+        "PASTE_YOUR_EXISTING_VAPID_PUBLIC_KEY_HERE") {
+      console.warn(
+        "VAPID key has not been added yet."
+      );
+      return;
+    }
+
+    messagingServiceWorkerRegistration =
+      await navigator.serviceWorker.register(
+        "/firebase-messaging-sw.js"
+      );
+
+    console.log(
+      "Firebase messaging service worker registered."
+    );
+
+    if (Notification.permission !== "granted") {
+      console.log(
+        "Notification permission is not granted."
+      );
+      return;
+    }
+
+    const token = await getToken(
+      messaging,
+      {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration:
+          messagingServiceWorkerRegistration
+      }
+    );
+
+    if (!token) {
+      console.warn(
+        "No FCM token was returned."
+      );
+      return;
+    }
+
+    await update(
+      ref(
+        db,
+        `users/${currentUser.uid}`
+      ),
+      {
+        fcmToken: token,
+        fcmTokenUpdatedAt: Date.now()
+      }
+    );
+
+    console.log(
+      "FCM TOKEN REGISTERED."
+    );
+
+  } catch (error) {
+    console.error(
+      "FCM TOKEN ERROR:",
+      error
+    );
+  }
+}
+
+
+// ============================================================
+// REQUEST NOTIFICATION PERMISSION
+// ============================================================
+
+async function requestNotificationPermission() {
+  if (
+    !("Notification" in window)
+  ) {
+    return;
+  }
+
+  try {
+    if (
+      Notification.permission === "default"
+    ) {
+      const permission =
+        await Notification.requestPermission();
+
+      console.log(
+        "Notification permission:",
+        permission
+      );
+    }
+
+    if (
+      Notification.permission === "granted"
+    ) {
+      await registerFCMToken();
+    }
+
+  } catch (error) {
+    console.warn(
+      "Notification permission error:",
+      error
+    );
+  }
+}
+
+
+// ============================================================
+// FOREGROUND FCM MESSAGE
+// ============================================================
+
+if (messaging) {
+  onMessage(
+    messaging,
+    payload => {
+      console.log(
+        "FOREGROUND FCM MESSAGE:",
+        payload
+      );
+
+      const notification =
+        payload.notification || {};
+
+      const data =
+        payload.data || {};
+
+      const title =
+        notification.title ||
+        data.title ||
+        "Incoming call";
+
+      const body =
+        notification.body ||
+        data.body ||
+        "Someone is calling you.";
+
+      showNotification(
+        `${title}: ${body}`
+      );
+
+      sendBrowserNotification(
+        title,
+        body
+      );
+    }
+  );
+}
+
+
+// ============================================================
 // AUTH UI
 // ============================================================
 
 function showAuthUI() {
-  $("authSection")?.classList.remove("hidden");
-  $("mainSection")?.classList.add("hidden");
+  $("authSection")?.classList.remove(
+    "hidden"
+  );
+
+  $("mainSection")?.classList.add(
+    "hidden"
+  );
 }
 
+
 function showMainUI() {
-  $("authSection")?.classList.add("hidden");
-  $("mainSection")?.classList.remove("hidden");
+  $("authSection")?.classList.add(
+    "hidden"
+  );
+
+  $("mainSection")?.classList.remove(
+    "hidden"
+  );
 }
 
 
@@ -227,8 +416,13 @@ function showMainUI() {
 $("showRegisterBtn")?.addEventListener(
   "click",
   () => {
-    $("loginForm")?.classList.add("hidden");
-    $("registerForm")?.classList.remove("hidden");
+    $("loginForm")?.classList.add(
+      "hidden"
+    );
+
+    $("registerForm")?.classList.remove(
+      "hidden"
+    );
 
     if ($("authMessage")) {
       $("authMessage").textContent = "";
@@ -244,8 +438,13 @@ $("showRegisterBtn")?.addEventListener(
 $("showLoginBtn")?.addEventListener(
   "click",
   () => {
-    $("registerForm")?.classList.add("hidden");
-    $("loginForm")?.classList.remove("hidden");
+    $("registerForm")?.classList.add(
+      "hidden"
+    );
+
+    $("loginForm")?.classList.remove(
+      "hidden"
+    );
 
     if ($("authMessage")) {
       $("authMessage").textContent = "";
@@ -291,14 +490,18 @@ async function registerUser(event) {
       message.textContent =
         "Please fill in all fields.";
     }
+
     return;
   }
 
-  if (password !== confirmPassword) {
+  if (
+    password !== confirmPassword
+  ) {
     if (message) {
       message.textContent =
         "Passwords do not match.";
     }
+
     return;
   }
 
@@ -307,6 +510,7 @@ async function registerUser(event) {
       message.textContent =
         "Password must be at least 6 characters.";
     }
+
     return;
   }
 
@@ -336,11 +540,17 @@ async function registerUser(event) {
         `users/${credential.user.uid}`
       ),
       {
-        uid: credential.user.uid,
+        uid:
+          credential.user.uid,
+
         name,
+
         email,
+
         online: true,
-        lastSeen: Date.now()
+
+        lastSeen:
+          Date.now()
       }
     );
 
@@ -395,6 +605,7 @@ async function loginUser(event) {
       message.textContent =
         "Enter your email and password.";
     }
+
     return;
   }
 
@@ -482,8 +693,11 @@ onAuthStateChanged(
 
     if (!user) {
       stopAllListeners();
+
       hideAllCallOverlays();
+
       showAuthUI();
+
       return;
     }
 
@@ -491,10 +705,10 @@ onAuthStateChanged(
 
     await updateMyUI();
 
-    await requestNotificationPermission();
-
     listenForUsers();
+
     listenForIncomingCalls();
+
     listenForHistory();
 
     try {
@@ -505,15 +719,20 @@ onAuthStateChanged(
         ),
         {
           uid: user.uid,
+
           name:
             user.displayName ||
             user.email ||
             "User",
+
           email:
             user.email ||
             "",
+
           online: true,
-          lastSeen: Date.now()
+
+          lastSeen:
+            Date.now()
         }
       );
 
@@ -576,6 +795,7 @@ async function updateMyUI() {
 function listenForUsers() {
   if (usersUnsubscribe) {
     usersUnsubscribe();
+
     usersUnsubscribe = null;
   }
 
@@ -619,6 +839,7 @@ function renderUsers(snapshot) {
   if (!snapshot.exists()) {
     container.innerHTML =
       "<p>No users found.</p>";
+
     return;
   }
 
@@ -635,13 +856,17 @@ function renderUsers(snapshot) {
       }
 
       const item =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
       item.className =
         "user-item";
 
       const avatar =
-        document.createElement("img");
+        document.createElement(
+          "img"
+        );
 
       avatar.src =
         makeAvatar(
@@ -656,13 +881,17 @@ function renderUsers(snapshot) {
         "User";
 
       const info =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
       info.className =
         "user-info";
 
       const name =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
       name.className =
         "user-name";
@@ -673,7 +902,9 @@ function renderUsers(snapshot) {
         "User";
 
       const email =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
       email.className =
         "user-email";
@@ -683,7 +914,9 @@ function renderUsers(snapshot) {
         "";
 
       const button =
-        document.createElement("button");
+        document.createElement(
+          "button"
+        );
 
       button.className =
         "call-user-btn";
@@ -696,10 +929,12 @@ function renderUsers(snapshot) {
         () => {
           startCall({
             uid,
+
             name:
               user.name ||
               user.email ||
               "User",
+
             email:
               user.email ||
               ""
@@ -714,7 +949,9 @@ function renderUsers(snapshot) {
       }
 
       item.appendChild(avatar);
+
       item.appendChild(info);
+
       item.appendChild(button);
 
       container.appendChild(item);
@@ -730,6 +967,7 @@ function renderUsers(snapshot) {
 function listenForIncomingCalls() {
   if (incomingCallsUnsubscribe) {
     incomingCallsUnsubscribe();
+
     incomingCallsUnsubscribe = null;
   }
 
@@ -785,18 +1023,18 @@ function listenForIncomingCalls() {
               uid:
                 call.callerId ||
                 "",
+
               name:
                 call.callerName ||
                 call.callerEmail ||
                 "User",
+
               email:
                 call.callerEmail ||
                 ""
             };
 
-            showIncomingCall(
-              call
-            );
+            showIncomingCall(call);
 
             sendBrowserNotification(
               "Incoming voice call",
@@ -804,6 +1042,10 @@ function listenForIncomingCalls() {
             );
 
             startRingtone();
+
+            listenForActiveCallChanges(
+              callId
+            );
           }
         );
       },
@@ -850,7 +1092,9 @@ function showIncomingCall(call) {
   }
 
   $("ringingIndicator")
-    ?.classList.remove("hidden");
+    ?.classList.remove(
+      "hidden"
+    );
 
   overlay?.classList.remove(
     "hidden"
@@ -914,10 +1158,12 @@ async function acceptCall() {
       uid:
         call.callerId ||
         "",
+
       name:
         call.callerName ||
         call.callerEmail ||
         "User",
+
       email:
         call.callerEmail ||
         ""
@@ -952,11 +1198,14 @@ async function acceptCall() {
           answer: {
             type:
               answer.type,
+
             sdp:
               answer.sdp
           },
+
           status:
             "accepted",
+
           acceptedAt:
             Date.now()
         }
@@ -964,6 +1213,10 @@ async function acceptCall() {
     }
 
     listenForCallerCandidates(
+      callId
+    );
+
+    listenForActiveCallChanges(
       callId
     );
 
@@ -992,6 +1245,7 @@ async function acceptCall() {
         {
           status:
             "failed",
+
           endedAt:
             Date.now()
         }
@@ -1047,6 +1301,7 @@ async function rejectCall() {
       {
         status:
           "rejected",
+
         endedAt:
           Date.now()
       }
@@ -1087,6 +1342,7 @@ async function startCall(user) {
     showNotification(
       "You are already in a call."
     );
+
     return;
   }
 
@@ -1114,10 +1370,12 @@ async function startCall(user) {
     currentRemoteUser = {
       uid:
         user.uid,
+
       name:
         user.name ||
         user.email ||
         "User",
+
       email:
         user.email ||
         ""
@@ -1168,6 +1426,7 @@ async function startCall(user) {
       offer: {
         type:
           offer.type,
+
         sdp:
           offer.sdp
       },
@@ -1193,6 +1452,10 @@ async function startCall(user) {
       callId
     );
 
+    listenForActiveCallChanges(
+      callId
+    );
+
   } catch (error) {
     console.error(
       "START CALL ERROR:",
@@ -1213,6 +1476,7 @@ async function startCall(user) {
           {
             status:
               "failed",
+
             endedAt:
               Date.now()
           }
@@ -1304,7 +1568,7 @@ function createPeerConnection() {
           event.streams[0];
 
         remoteAudio.muted =
-          false;
+          !isSpeakerOn;
 
         remoteAudio.play()
           .catch(error => {
@@ -1531,7 +1795,9 @@ async function addPendingRemoteCandidates() {
   pendingRemoteCandidates =
     [];
 
-  for (const candidate of candidates) {
+  for (
+    const candidate of candidates
+  ) {
     try {
       await peerConnection.addIceCandidate(
         new RTCIceCandidate(
@@ -1649,7 +1915,9 @@ function listenForOutgoingCallChanges(
               "Connected"
             );
 
-            startCallTimer();
+            if (!callStartTime) {
+              startCallTimer();
+            }
 
           } catch (error) {
             console.error(
@@ -1717,9 +1985,14 @@ function listenForActiveCallChanges(
           call.status ===
           "cancelled"
         ) {
-          showNotification(
-            "The caller cancelled the call."
-          );
+          if (
+            currentCallRole ===
+            "callee"
+          ) {
+            showNotification(
+              "The caller cancelled the call."
+            );
+          }
 
           await saveMyHistory(
             callId,
@@ -1822,7 +2095,9 @@ function showOutgoingCall(user) {
   }
 
   $("outgoingRinging")
-    ?.classList.remove("hidden");
+    ?.classList.remove(
+      "hidden"
+    );
 
   overlay?.classList.remove(
     "hidden"
@@ -1876,6 +2151,7 @@ async function cancelOutgoingCall() {
       {
         status:
           "cancelled",
+
         endedAt:
           Date.now()
       }
@@ -2203,6 +2479,7 @@ async function endCall() {
       {
         status:
           "ended",
+
         endedAt:
           Date.now()
       }
@@ -2311,6 +2588,7 @@ async function saveMyHistory(
     console.warn(
       "Cannot save history: no logged-in user."
     );
+
     return;
   }
 
@@ -2318,6 +2596,7 @@ async function saveMyHistory(
     console.warn(
       "Cannot save history: no call ID."
     );
+
     return;
   }
 
@@ -2942,6 +3221,9 @@ async function cleanupCall(
   if (remoteAudio) {
     remoteAudio.srcObject =
       null;
+
+    remoteAudio.muted =
+      false;
   }
 
   currentCallId =
@@ -3021,7 +3303,76 @@ window.addEventListener(
 
 
 // ============================================================
-// STARTUP LOG
+// NOTIFICATION SETUP BUTTON
+// ============================================================
+
+// This lets the user grant notification permission
+// from a real button click, which browsers prefer.
+
+const notificationButton =
+  document.createElement("button");
+
+notificationButton.textContent =
+  "🔔 Enable Call Notifications";
+
+notificationButton.type =
+  "button";
+
+notificationButton.id =
+  "enableNotificationsBtn";
+
+notificationButton.style.display =
+  "none";
+
+notificationButton.addEventListener(
+  "click",
+  async () => {
+    await requestNotificationPermission();
+
+    if (
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      notificationButton.style.display =
+        "none";
+
+      showNotification(
+        "Call notifications enabled."
+      );
+    }
+  }
+);
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    const main =
+      $("mainSection");
+
+    if (
+      main &&
+      !document.getElementById(
+        "enableNotificationsBtn"
+      )
+    ) {
+      main.prepend(
+        notificationButton
+      );
+    }
+
+    if (
+      "Notification" in window &&
+      Notification.permission !== "granted"
+    ) {
+      notificationButton.style.display =
+        "block";
+    }
+  }
+);
+
+
+// ============================================================
+// STARTUP
 // ============================================================
 
 console.log(
