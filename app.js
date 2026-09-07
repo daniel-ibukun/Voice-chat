@@ -1,14 +1,10 @@
 // ============================================================
-// VOICE CHAT APP - COMPLETE APP.JS
-// Firebase Auth + Realtime Database + WebRTC + FCM
+// VOICE CHAT APP
+// Firebase + Authentication + Realtime Database + WebRTC
+// Firebase SDK 12.0.0
 // ============================================================
 
-// ============================================================
-// FIREBASE IMPORTS
-// ============================================================
-
-import { initializeApp } from
-  "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 
 import {
   getAuth,
@@ -17,8 +13,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
-} from
-  "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 import {
   getDatabase,
@@ -30,15 +25,13 @@ import {
   onValue,
   onChildAdded,
   onDisconnect
-} from
-  "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
 
 import {
   getMessaging,
   getToken,
   onMessage
-} from
-  "https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging.js";
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging.js";
 
 
 // ============================================================
@@ -46,7 +39,7 @@ import {
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAVy5nFd6sjyoVSYnnqRfXJpu29FstxFZc",
+  apiKey: "YOUR_EXISTING_API_KEY",
   authDomain: "voice-chat01-63e85.firebaseapp.com",
   databaseURL: "https://voice-chat01-63e85-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "voice-chat01-63e85",
@@ -57,45 +50,34 @@ const firebaseConfig = {
 
 
 // ============================================================
-// INITIALIZE FIREBASE
+// FIREBASE INITIALIZATION
 // ============================================================
 
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
-
 const db = getDatabase(app);
 
 let messaging = null;
 
 try {
-  if (
-    "serviceWorker" in navigator &&
-    "Notification" in window
-  ) {
-    messaging = getMessaging(app);
-  }
+  messaging = getMessaging(app);
 } catch (error) {
-  console.warn(
-    "Firebase Messaging could not initialize:",
-    error
-  );
+  console.warn("Firebase Messaging could not initialize:", error);
 }
 
 
 // ============================================================
-// FCM / VAPID
+// HELPER
 // ============================================================
 
-// Paste the VAPID public key you already generated.
-const VAPID_KEY =  "BFhU6C-xoaa9VLZopXwHVADPWqSWxlKaYkCvvK3HaQ0RIImUVFKg5aYpIq2L5Odmd73Cf895Se1zdT9PPmQz-cE";
-
-
-let messagingServiceWorkerRegistration = null;
+function $(id) {
+  return document.getElementById(id);
+}
 
 
 // ============================================================
-// GLOBAL STATE
+// GLOBAL VARIABLES
 // ============================================================
 
 let currentUser = null;
@@ -104,11 +86,13 @@ let currentCallId = null;
 let currentCallRole = null;
 let currentRemoteUser = null;
 
-let localStream = null;
-let peerConnection = null;
-
 let pendingIncomingCall = null;
+
+let peerConnection = null;
+let localStream = null;
+
 let pendingRemoteCandidates = [];
+let remoteDescriptionSet = false;
 
 let callStartTime = null;
 let callTimerInterval = null;
@@ -125,12 +109,14 @@ let historyUnsubscribe = null;
 
 let callUnsubscribers = [];
 
+let currentPresenceRef = null;
+
 
 // ============================================================
 // WEBRTC CONFIG
 // ============================================================
 
-const rtcConfig = {
+const rtcConfiguration = {
   iceServers: [
     {
       urls: "stun:stun.l.google.com:19302"
@@ -146,15 +132,6 @@ const rtcConfig = {
 
 
 // ============================================================
-// HELPER
-// ============================================================
-
-function $(id) {
-  return document.getElementById(id);
-}
-
-
-// ============================================================
 // AVATAR
 // ============================================================
 
@@ -164,344 +141,97 @@ function makeAvatar(name) {
       String(name || "User").trim() || "User"
     );
 
-  return (
-    `https://ui-avatars.com/api/?name=${safeName}` +
-    `&background=random&color=fff`
-  );
+  return `https://ui-avatars.com/api/?name=${safeName}&background=random&color=fff`;
 }
 
 
 // ============================================================
-// APP NOTIFICATION
+// NOTIFICATION MESSAGE
 // ============================================================
 
-function showNotification(message) {
-  const notification = $("notification");
+let notificationTimeout = null;
 
-  if (!notification) {
+function showNotification(message) {
+  const element = $("notification");
+
+  if (!element) {
     console.log("NOTIFICATION:", message);
     return;
   }
 
-  notification.textContent = message;
+  element.textContent = message;
+  element.style.display = "block";
 
-  notification.classList.remove("hidden");
+  clearTimeout(notificationTimeout);
 
-  clearTimeout(notification._timeout);
-
-  notification._timeout =
-    setTimeout(() => {
-      notification.classList.add("hidden");
-    }, 4000);
+  notificationTimeout = setTimeout(() => {
+    element.style.display = "none";
+  }, 4000);
 }
 
 
 // ============================================================
-// BROWSER NOTIFICATION
+// AUTH - SHOW LOGIN
 // ============================================================
 
-function sendBrowserNotification(title, body) {
-  if (
-    !("Notification" in window) ||
-    Notification.permission !== "granted"
-  ) {
-    return;
+$("showLoginBtn")?.addEventListener("click", () => {
+  $("registerBox")?.classList.add("hidden");
+  $("loginBox")?.classList.remove("hidden");
+
+  if ($("registerMessage")) {
+    $("registerMessage").textContent = "";
   }
 
-  try {
-    new Notification(title, {
-      body,
-      icon: makeAvatar(title)
-    });
-  } catch (error) {
-    console.warn(
-      "Browser notification error:",
-      error
-    );
+  if ($("authMessage")) {
+    $("authMessage").textContent = "";
   }
-}
+});
 
 
 // ============================================================
-// REGISTER FCM TOKEN
+// AUTH - SHOW REGISTER
 // ============================================================
 
-async function registerFCMToken() {
-  if (
-    !currentUser ||
-    !messaging ||
-    !("serviceWorker" in navigator) ||
-    !("Notification" in window)
-  ) {
-    return;
+$("showRegisterBtn")?.addEventListener("click", () => {
+  $("loginBox")?.classList.add("hidden");
+  $("registerBox")?.classList.remove("hidden");
+
+  if ($("authMessage")) {
+    $("authMessage").textContent = "";
   }
 
-  try {
-    if (!VAPID_KEY ||
-        VAPID_KEY ===
-        "PASTE_YOUR_EXISTING_VAPID_PUBLIC_KEY_HERE") {
-      console.warn(
-        "VAPID key has not been added yet."
-      );
-      return;
-    }
-
-    messagingServiceWorkerRegistration =
-      await navigator.serviceWorker.register(
-        "/firebase-messaging-sw.js"
-      );
-
-    console.log(
-      "Firebase messaging service worker registered."
-    );
-
-    if (Notification.permission !== "granted") {
-      console.log(
-        "Notification permission is not granted."
-      );
-      return;
-    }
-
-    const token = await getToken(
-      messaging,
-      {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration:
-          messagingServiceWorkerRegistration
-      }
-    );
-
-    if (!token) {
-      console.warn(
-        "No FCM token was returned."
-      );
-      return;
-    }
-
-    await update(
-      ref(
-        db,
-        `users/${currentUser.uid}`
-      ),
-      {
-        fcmToken: token,
-        fcmTokenUpdatedAt: Date.now()
-      }
-    );
-
-    console.log(
-      "FCM TOKEN REGISTERED."
-    );
-
-  } catch (error) {
-    console.error(
-      "FCM TOKEN ERROR:",
-      error
-    );
+  if ($("registerMessage")) {
+    $("registerMessage").textContent = "";
   }
-}
-
-
-// ============================================================
-// REQUEST NOTIFICATION PERMISSION
-// ============================================================
-
-async function requestNotificationPermission() {
-  if (
-    !("Notification" in window)
-  ) {
-    return;
-  }
-
-  try {
-    if (
-      Notification.permission === "default"
-    ) {
-      const permission =
-        await Notification.requestPermission();
-
-      console.log(
-        "Notification permission:",
-        permission
-      );
-    }
-
-    if (
-      Notification.permission === "granted"
-    ) {
-      await registerFCMToken();
-    }
-
-  } catch (error) {
-    console.warn(
-      "Notification permission error:",
-      error
-    );
-  }
-}
-
-
-// ============================================================
-// FOREGROUND FCM MESSAGE
-// ============================================================
-
-if (messaging) {
-  onMessage(
-    messaging,
-    payload => {
-      console.log(
-        "FOREGROUND FCM MESSAGE:",
-        payload
-      );
-
-      const notification =
-        payload.notification || {};
-
-      const data =
-        payload.data || {};
-
-      const title =
-        notification.title ||
-        data.title ||
-        "Incoming call";
-
-      const body =
-        notification.body ||
-        data.body ||
-        "Someone is calling you.";
-
-      showNotification(
-        `${title}: ${body}`
-      );
-
-      sendBrowserNotification(
-        title,
-        body
-      );
-    }
-  );
-}
-
-
-// ============================================================
-// AUTH UI
-// ============================================================
-
-function showAuthUI() {
-  $("authSection")?.classList.remove(
-    "hidden"
-  );
-
-  $("mainSection")?.classList.add(
-    "hidden"
-  );
-}
-
-
-function showMainUI() {
-  $("authSection")?.classList.add(
-    "hidden"
-  );
-
-  $("mainSection")?.classList.remove(
-    "hidden"
-  );
-}
-
-
-// ============================================================
-// REGISTER / LOGIN FORM SWITCHING
-// ============================================================
-
-$("showRegisterBtn")?.addEventListener(
-  "click",
-  () => {
-    $("loginForm")?.classList.add(
-      "hidden"
-    );
-
-    $("registerForm")?.classList.remove(
-      "hidden"
-    );
-
-    if ($("authMessage")) {
-      $("authMessage").textContent = "";
-    }
-
-    if ($("registerMessage")) {
-      $("registerMessage").textContent = "";
-    }
-  }
-);
-
-
-$("showLoginBtn")?.addEventListener(
-  "click",
-  () => {
-    $("registerForm")?.classList.add(
-      "hidden"
-    );
-
-    $("loginForm")?.classList.remove(
-      "hidden"
-    );
-
-    if ($("authMessage")) {
-      $("authMessage").textContent = "";
-    }
-
-    if ($("registerMessage")) {
-      $("registerMessage").textContent = "";
-    }
-  }
-);
+});
 
 
 // ============================================================
 // REGISTER
 // ============================================================
 
-$("registerBtn")?.addEventListener(
-  "click",
-  registerUser
-);
+$("registerForm")?.addEventListener("submit", async event => {
+  event.preventDefault();
 
+  const name = $("registerName")?.value.trim();
+  const email = $("registerEmail")?.value.trim();
+  const password = $("registerPassword")?.value;
+  const confirmPassword = $("registerConfirmPassword")?.value;
 
-async function registerUser(event) {
-  event?.preventDefault();
+  const message = $("registerMessage");
+  const button = $("registerBtn");
 
-  const name =
-    $("registerName")?.value.trim() || "";
-
-  const email =
-    $("registerEmail")?.value.trim() || "";
-
-  const password =
-    $("registerPassword")?.value || "";
-
-  const confirmPassword =
-    $("registerConfirmPassword")?.value || "";
-
-  const message =
-    $("registerMessage");
-
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !confirmPassword) {
     if (message) {
-      message.textContent =
-        "Please fill in all fields.";
+      message.textContent = "Please fill in every field.";
     }
-
     return;
   }
 
-  if (
-    password !== confirmPassword
-  ) {
+  if (password !== confirmPassword) {
     if (message) {
-      message.textContent =
-        "Passwords do not match.";
+      message.textContent = "Passwords do not match.";
     }
-
     return;
   }
 
@@ -510,14 +240,13 @@ async function registerUser(event) {
       message.textContent =
         "Password must be at least 6 characters.";
     }
-
     return;
   }
 
   try {
-    if (message) {
-      message.textContent =
-        "Creating account...";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Creating account...";
     }
 
     const credential =
@@ -527,30 +256,18 @@ async function registerUser(event) {
         password
       );
 
-    await updateProfile(
-      credential.user,
-      {
-        displayName: name
-      }
-    );
+    await updateProfile(credential.user, {
+      displayName: name
+    });
 
     await set(
-      ref(
-        db,
-        `users/${credential.user.uid}`
-      ),
+      ref(db, `users/${credential.user.uid}`),
       {
-        uid:
-          credential.user.uid,
-
-        name,
-
-        email,
-
+        uid: credential.user.uid,
+        name: name,
+        email: email,
         online: true,
-
-        lastSeen:
-          Date.now()
+        createdAt: Date.now()
       }
     );
 
@@ -559,60 +276,48 @@ async function registerUser(event) {
         "Account created successfully!";
     }
 
-    showNotification(
-      "Account created successfully."
-    );
-
   } catch (error) {
-    console.error(
-      "REGISTER ERROR:",
-      error
-    );
+    console.error("REGISTER ERROR:", error);
 
     if (message) {
       message.textContent =
-        error.message ||
-        "Registration failed.";
+        getFirebaseErrorMessage(error);
+    }
+
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Create Account";
     }
   }
-}
+});
 
 
 // ============================================================
 // LOGIN
 // ============================================================
 
-$("loginBtn")?.addEventListener(
-  "click",
-  loginUser
-);
+$("loginForm")?.addEventListener("submit", async event => {
+  event.preventDefault();
 
+  const email = $("loginEmail")?.value.trim();
+  const password = $("loginPassword")?.value;
 
-async function loginUser(event) {
-  event?.preventDefault();
-
-  const email =
-    $("loginEmail")?.value.trim() || "";
-
-  const password =
-    $("loginPassword")?.value || "";
-
-  const message =
-    $("authMessage");
+  const message = $("authMessage");
+  const button = $("loginBtn");
 
   if (!email || !password) {
     if (message) {
       message.textContent =
-        "Enter your email and password.";
+        "Please enter your email and password.";
     }
-
     return;
   }
 
   try {
-    if (message) {
-      message.textContent =
-        "Logging in...";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Logging in...";
     }
 
     await signInWithEmailAndPassword(
@@ -626,42 +331,35 @@ async function loginUser(event) {
     }
 
   } catch (error) {
-    console.error(
-      "LOGIN ERROR:",
-      error
-    );
+    console.error("LOGIN ERROR:", error);
 
     if (message) {
       message.textContent =
-        error.message ||
-        "Login failed.";
+        getFirebaseErrorMessage(error);
+    }
+
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Login";
     }
   }
-}
+});
 
 
 // ============================================================
 // LOGOUT
 // ============================================================
 
-$("logoutBtn")?.addEventListener(
-  "click",
-  logoutUser
-);
+$("logoutBtn")?.addEventListener("click", async () => {
 
-
-async function logoutUser() {
   try {
-    if (currentCallId) {
-      await endCall();
-    }
+
+    await cleanupCall(true);
 
     if (currentUser) {
       await update(
-        ref(
-          db,
-          `users/${currentUser.uid}`
-        ),
+        ref(db, `users/${currentUser.uid}`),
         {
           online: false,
           lastSeen: Date.now()
@@ -674,10 +372,45 @@ async function logoutUser() {
     await signOut(auth);
 
   } catch (error) {
-    console.error(
-      "LOGOUT ERROR:",
-      error
-    );
+    console.error("LOGOUT ERROR:", error);
+  }
+
+});
+
+
+// ============================================================
+// FIREBASE ERROR MESSAGES
+// ============================================================
+
+function getFirebaseErrorMessage(error) {
+
+  const code = error?.code || "";
+
+  switch (code) {
+
+    case "auth/invalid-credential":
+      return "Incorrect email or password.";
+
+    case "auth/invalid-email":
+      return "Please enter a valid email.";
+
+    case "auth/email-already-in-use":
+      return "That email is already registered.";
+
+    case "auth/weak-password":
+      return "Password is too weak.";
+
+    case "auth/user-not-found":
+      return "User account not found.";
+
+    case "auth/wrong-password":
+      return "Incorrect password.";
+
+    case "auth/network-request-failed":
+      return "Network error. Check your internet connection.";
+
+    default:
+      return error?.message || "Something went wrong.";
   }
 }
 
@@ -686,24 +419,23 @@ async function logoutUser() {
 // AUTH STATE
 // ============================================================
 
-onAuthStateChanged(
-  auth,
-  async user => {
+onAuthStateChanged(auth, async user => {
+
+  console.log(
+    "AUTH STATE:",
+    user ? user.email : "SIGNED OUT"
+  );
+
+  if (user) {
+
     currentUser = user;
 
-    if (!user) {
-      stopAllListeners();
+    $("authSection")?.classList.add("hidden");
+    $("mainSection")?.classList.remove("hidden");
 
-      hideAllCallOverlays();
+    await loadCurrentUser();
 
-      showAuthUI();
-
-      return;
-    }
-
-    showMainUI();
-
-    await updateMyUI();
+    startPresence();
 
     listenForUsers();
 
@@ -711,114 +443,150 @@ onAuthStateChanged(
 
     listenForHistory();
 
-    try {
-      await update(
-        ref(
-          db,
-          `users/${user.uid}`
-        ),
-        {
-          uid: user.uid,
+    setupNotificationButton();
 
-          name:
-            user.displayName ||
-            user.email ||
-            "User",
+    setupForegroundMessaging();
 
-          email:
-            user.email ||
-            "",
+    console.log(
+      "VOICE CHAT READY FOR:",
+      currentUser.email
+    );
 
-          online: true,
+  } else {
 
-          lastSeen:
-            Date.now()
-        }
-      );
+    currentUser = null;
 
-      onDisconnect(
-        ref(
-          db,
-          `users/${user.uid}/online`
-        )
-      ).set(false);
+    $("authSection")?.classList.remove("hidden");
+    $("mainSection")?.classList.add("hidden");
 
-    } catch (error) {
-      console.error(
-        "USER ONLINE ERROR:",
-        error
-      );
+    stopAllListeners();
+
+  }
+
+});
+
+
+// ============================================================
+// LOAD CURRENT USER
+// ============================================================
+
+async function loadCurrentUser() {
+
+  if (!currentUser) return;
+
+  try {
+
+    const userRef =
+      ref(db, `users/${currentUser.uid}`);
+
+    const snapshot = await get(userRef);
+
+    let name =
+      currentUser.displayName ||
+      currentUser.email ||
+      "User";
+
+    if (snapshot.exists()) {
+
+      const data = snapshot.val();
+
+      name =
+        data.name ||
+        currentUser.displayName ||
+        currentUser.email ||
+        "User";
     }
-  }
-);
 
+    if ($("welcomeText")) {
+      $("welcomeText").textContent =
+        `Welcome, ${name}!`;
+    }
 
-// ============================================================
-// UPDATE MY UI
-// ============================================================
+    if ($("myAvatar")) {
+      $("myAvatar").src =
+        makeAvatar(name);
+    }
 
-async function updateMyUI() {
-  if (!currentUser) {
-    return;
-  }
+  } catch (error) {
 
-  const name =
-    currentUser.displayName ||
-    currentUser.email ||
-    "User";
+    console.error(
+      "LOAD CURRENT USER ERROR:",
+      error
+    );
 
-  const welcome =
-    $("welcomeText");
-
-  if (welcome) {
-    welcome.textContent =
-      `Welcome, ${name}`;
-  }
-
-  const avatar =
-    $("myAvatar");
-
-  if (avatar) {
-    avatar.src =
-      makeAvatar(name);
-
-    avatar.alt =
-      name;
   }
 }
 
 
 // ============================================================
-// LISTEN FOR USERS
+// PRESENCE
+// ============================================================
+
+function startPresence() {
+
+  if (!currentUser) return;
+
+  currentPresenceRef =
+    ref(db, `users/${currentUser.uid}`);
+
+  update(currentPresenceRef, {
+    online: true,
+    lastSeen: Date.now()
+  }).catch(error => {
+    console.error("PRESENCE ERROR:", error);
+  });
+
+  onDisconnect(currentPresenceRef)
+    .update({
+      online: false,
+      lastSeen: Date.now()
+    })
+    .catch(error => {
+      console.error(
+        "PRESENCE DISCONNECT ERROR:",
+        error
+      );
+    });
+}
+
+
+// ============================================================
+// USERS LIST
 // ============================================================
 
 function listenForUsers() {
+
   if (usersUnsubscribe) {
     usersUnsubscribe();
-
     usersUnsubscribe = null;
   }
 
-  if (!currentUser) {
-    return;
-  }
+  const usersRef = ref(db, "users");
 
-  const usersRef =
-    ref(db, "users");
+  usersUnsubscribe = onValue(
+    usersRef,
 
-  usersUnsubscribe =
-    onValue(
-      usersRef,
-      snapshot => {
-        renderUsers(snapshot);
-      },
-      error => {
-        console.error(
-          "USERS LISTENER ERROR:",
-          error
-        );
+    snapshot => {
+
+      renderUsers(snapshot);
+
+    },
+
+    error => {
+
+      console.error(
+        "USERS LIST ERROR:",
+        error
+      );
+
+      const container = $("usersList");
+
+      if (container) {
+        container.innerHTML =
+          "<p>Could not load users.</p>";
       }
-    );
+    }
+  );
 }
 
 
@@ -827,46 +595,54 @@ function listenForUsers() {
 // ============================================================
 
 function renderUsers(snapshot) {
-  const container =
-    $("usersList");
+
+  const container = $("usersList");
 
   if (!container) {
+    console.error(
+      "usersList element was not found in index.html"
+    );
     return;
   }
 
   container.innerHTML = "";
 
   if (!snapshot.exists()) {
+
     container.innerHTML =
-      "<p>No users found.</p>";
+      "<p>No other users have registered yet.</p>";
 
     return;
   }
 
-  const users =
-    snapshot.val();
+  const users = snapshot.val();
+
+  let count = 0;
 
   Object.entries(users).forEach(
     ([uid, user]) => {
+
       if (
-        !currentUser ||
-        uid === currentUser.uid
+        !user ||
+        uid === currentUser?.uid
       ) {
         return;
       }
 
-      const item =
-        document.createElement(
-          "div"
-        );
+      count++;
 
-      item.className =
-        "user-item";
+      const item =
+        document.createElement("div");
+
+      item.className = "user-item";
+
+      const info =
+        document.createElement("div");
+
+      info.className = "user-info";
 
       const avatar =
-        document.createElement(
-          "img"
-        );
+        document.createElement("img");
 
       avatar.src =
         makeAvatar(
@@ -880,21 +656,13 @@ function renderUsers(snapshot) {
         user.email ||
         "User";
 
-      const info =
-        document.createElement(
-          "div"
-        );
-
-      info.className =
-        "user-info";
+      const text =
+        document.createElement("div");
 
       const name =
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
-      name.className =
-        "user-name";
+      name.className = "user-name";
 
       name.textContent =
         user.name ||
@@ -902,24 +670,25 @@ function renderUsers(snapshot) {
         "User";
 
       const email =
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
-      email.className =
-        "user-email";
+      email.className = "user-email";
 
       email.textContent =
-        user.email ||
-        "";
+        user.email || "";
+
+      text.appendChild(name);
+      text.appendChild(email);
+
+      info.appendChild(avatar);
+      info.appendChild(text);
 
       const button =
-        document.createElement(
-          "button"
-        );
+        document.createElement("button");
 
-      button.className =
-        "call-user-btn";
+      button.type = "button";
+
+      button.className = "call-btn";
 
       button.textContent =
         "📞 Call";
@@ -928,51 +697,576 @@ function renderUsers(snapshot) {
         "click",
         () => {
           startCall({
-            uid,
-
+            uid: uid,
             name:
               user.name ||
               user.email ||
               "User",
-
             email:
-              user.email ||
-              ""
+              user.email || ""
           });
         }
       );
 
-      info.appendChild(name);
-
-      if (user.email) {
-        info.appendChild(email);
-      }
-
-      item.appendChild(avatar);
-
       item.appendChild(info);
-
       item.appendChild(button);
 
       container.appendChild(item);
     }
   );
+
+  if (count === 0) {
+
+    container.innerHTML =
+      "<p>No other users are available.</p>";
+  }
 }
 
 
 // ============================================================
-// INCOMING CALL LISTENER
+// START CALL
+// ============================================================
+
+async function startCall(remoteUser) {
+
+  if (!currentUser) {
+    showNotification("Please log in first.");
+    return;
+  }
+
+  if (currentCallId) {
+    showNotification(
+      "You are already in a call."
+    );
+    return;
+  }
+
+  if (!remoteUser?.uid) {
+    showNotification(
+      "Could not find this user."
+    );
+    return;
+  }
+
+  if (remoteUser.uid === currentUser.uid) {
+    showNotification(
+      "You cannot call yourself."
+    );
+    return;
+  }
+
+  try {
+
+    console.log(
+      "STARTING CALL TO:",
+      remoteUser
+    );
+
+    currentRemoteUser = remoteUser;
+
+    currentCallRole = "caller";
+
+    localStream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false
+      });
+
+    peerConnection =
+      createPeerConnection();
+
+    localStream
+      .getTracks()
+      .forEach(track => {
+
+        peerConnection.addTrack(
+          track,
+          localStream
+        );
+
+      });
+
+    const callRef =
+      push(ref(db, "calls"));
+
+    currentCallId = callRef.key;
+
+    const callData = {
+
+      callId: currentCallId,
+
+      callerId: currentUser.uid,
+
+      callerName:
+        currentUser.displayName ||
+        currentUser.email ||
+        "User",
+
+      callerEmail:
+        currentUser.email || "",
+
+      calleeId: remoteUser.uid,
+
+      calleeName:
+        remoteUser.name ||
+        remoteUser.email ||
+        "User",
+
+      calleeEmail:
+        remoteUser.email || "",
+
+      type: "voice",
+
+      status: "ringing",
+
+      createdAt: Date.now()
+    };
+
+    await set(
+      callRef,
+      callData
+    );
+
+    listenForCallChanges(
+      currentCallId,
+      "caller"
+    );
+
+    listenForIceCandidates(
+      currentCallId,
+      "callee"
+    );
+
+    const offer =
+      await peerConnection.createOffer();
+
+    await peerConnection.setLocalDescription(
+      offer
+    );
+
+    await update(
+      ref(db, `calls/${currentCallId}`),
+      {
+        offer: {
+          type: offer.type,
+          sdp: offer.sdp
+        }
+      }
+    );
+
+    showOutgoingCall(remoteUser);
+
+    startRingtone();
+
+    saveMyHistory(
+      currentCallId,
+      "ringing",
+      0,
+      callData
+    );
+
+    console.log(
+      "CALL CREATED:",
+      currentCallId
+    );
+
+  } catch (error) {
+
+    console.error(
+      "START CALL ERROR:",
+      error
+    );
+
+    showNotification(
+      "Could not start the call: " +
+      error.message
+    );
+
+    if (currentCallId) {
+
+      try {
+        await update(
+          ref(db, `calls/${currentCallId}`),
+          {
+            status: "failed",
+            endedAt: Date.now()
+          }
+        );
+      } catch (updateError) {
+        console.error(
+          "CALL FAILURE UPDATE ERROR:",
+          updateError
+        );
+      }
+    }
+
+    await cleanupCall(false);
+  }
+}
+
+
+// ============================================================
+// CREATE PEER CONNECTION
+// ============================================================
+
+function createPeerConnection() {
+
+  const pc =
+    new RTCPeerConnection(
+      rtcConfiguration
+    );
+
+  pc.onicecandidate = event => {
+
+    if (
+      !event.candidate ||
+      !currentCallId ||
+      !currentCallRole
+    ) {
+      return;
+    }
+
+    const side =
+      currentCallRole === "caller"
+        ? "caller"
+        : "callee";
+
+    const candidateRef =
+      push(
+        ref(
+          db,
+          `calls/${currentCallId}/candidates/${side}`
+        )
+      );
+
+    set(
+      candidateRef,
+      event.candidate.toJSON()
+    ).catch(error => {
+
+      console.error(
+        "ICE CANDIDATE ERROR:",
+        error
+      );
+
+    });
+  };
+
+
+  pc.ontrack = event => {
+
+    console.log(
+      "REMOTE AUDIO TRACK RECEIVED"
+    );
+
+    const remoteAudio =
+      $("remoteAudio");
+
+    if (!remoteAudio) return;
+
+    if (
+      event.streams &&
+      event.streams[0]
+    ) {
+
+      remoteAudio.srcObject =
+        event.streams[0];
+
+    } else {
+
+      const stream =
+        new MediaStream([
+          event.track
+        ]);
+
+      remoteAudio.srcObject =
+        stream;
+    }
+
+    remoteAudio.muted = false;
+
+    remoteAudio.play()
+      .catch(error => {
+
+        console.warn(
+          "REMOTE AUDIO PLAY BLOCKED:",
+          error
+        );
+
+      });
+  };
+
+
+  pc.onconnectionstatechange = () => {
+
+    console.log(
+      "WEBRTC CONNECTION:",
+      pc.connectionState
+    );
+
+    switch (pc.connectionState) {
+
+      case "connected":
+
+        stopRingtone();
+
+        if (!callStartTime) {
+          startCallTimer();
+        }
+
+        updateCallStatus(
+          "Connected"
+        );
+
+        break;
+
+
+      case "connecting":
+
+        updateCallStatus(
+          "Connecting..."
+        );
+
+        break;
+
+
+      case "disconnected":
+
+        updateCallStatus(
+          "Connection interrupted..."
+        );
+
+        break;
+
+
+      case "failed":
+
+        updateCallStatus(
+          "Connection failed"
+        );
+
+        showNotification(
+          "The call connection failed."
+        );
+
+        setTimeout(() => {
+          if (currentCallId) {
+            endCall();
+          }
+        }, 1500);
+
+        break;
+
+
+      case "closed":
+
+        break;
+    }
+  };
+
+
+  pc.oniceconnectionstatechange =
+    () => {
+
+      console.log(
+        "ICE STATE:",
+        pc.iceConnectionState
+      );
+    };
+
+
+  return pc;
+}
+
+
+// ============================================================
+// LISTEN FOR CALL CHANGES
+// ============================================================
+
+function listenForCallChanges(
+  callId,
+  role
+) {
+
+  const callRef =
+    ref(db, `calls/${callId}`);
+
+  const unsubscribe =
+    onValue(
+      callRef,
+      async snapshot => {
+
+        if (!snapshot.exists()) {
+          return;
+        }
+
+        const call =
+          snapshot.val();
+
+        console.log(
+          "CALL UPDATE:",
+          call
+        );
+
+
+        // --------------------------------------------
+        // CALL ENDED
+        // --------------------------------------------
+
+        if (
+          call.status === "ended" ||
+          call.status === "rejected" ||
+          call.status === "cancelled" ||
+          call.status === "failed"
+        ) {
+
+          const status =
+            call.status;
+
+          if (
+            currentCallId === callId
+          ) {
+
+            if (role === "caller") {
+
+              await saveMyHistory(
+                callId,
+                status,
+                getCallDuration(),
+                call
+              );
+
+            }
+
+            await cleanupCall(false);
+          }
+
+          return;
+        }
+
+
+        // --------------------------------------------
+        // CALLEE ACCEPTED
+        // --------------------------------------------
+
+        if (
+          role === "caller" &&
+          call.status === "accepted"
+        ) {
+
+          stopRingtone();
+
+          hideOutgoingCall();
+
+          showActiveCall(
+            currentRemoteUser
+          );
+
+          updateCallStatus(
+            "Connecting..."
+          );
+
+          if (
+            call.answer &&
+            peerConnection &&
+            !remoteDescriptionSet
+          ) {
+
+            try {
+
+              await peerConnection.setRemoteDescription(
+                new RTCSessionDescription(
+                  call.answer
+                )
+              );
+
+              remoteDescriptionSet = true;
+
+              await flushPendingCandidates();
+
+            } catch (error) {
+
+              console.error(
+                "SET ANSWER ERROR:",
+                error
+              );
+
+            }
+          }
+
+          return;
+        }
+
+
+        // --------------------------------------------
+        // CALLER RECEIVED ANSWER
+        // --------------------------------------------
+
+        if (
+          role === "caller" &&
+          call.answer &&
+          peerConnection &&
+          !remoteDescriptionSet
+        ) {
+
+          try {
+
+            await peerConnection.setRemoteDescription(
+              new RTCSessionDescription(
+                call.answer
+              )
+            );
+
+            remoteDescriptionSet = true;
+
+            stopRingtone();
+
+            hideOutgoingCall();
+
+            showActiveCall(
+              currentRemoteUser
+            );
+
+            updateCallStatus(
+              "Connecting..."
+            );
+
+            await flushPendingCandidates();
+
+          } catch (error) {
+
+            console.error(
+              "ANSWER PROCESSING ERROR:",
+              error
+            );
+          }
+        }
+
+      },
+      error => {
+
+        console.error(
+          "CALL LISTENER ERROR:",
+          error
+        );
+      }
+    );
+
+  callUnsubscribers.push(
+    unsubscribe
+  );
+}
+
+
+// ============================================================
+// LISTEN FOR INCOMING CALLS
 // ============================================================
 
 function listenForIncomingCalls() {
+
   if (incomingCallsUnsubscribe) {
     incomingCallsUnsubscribe();
-
     incomingCallsUnsubscribe = null;
-  }
-
-  if (!currentUser) {
-    return;
   }
 
   const callsRef =
@@ -981,7 +1275,9 @@ function listenForIncomingCalls() {
   incomingCallsUnsubscribe =
     onValue(
       callsRef,
+
       snapshot => {
+
         if (!snapshot.exists()) {
           return;
         }
@@ -989,67 +1285,73 @@ function listenForIncomingCalls() {
         const calls =
           snapshot.val();
 
-        Object.entries(calls).forEach(
-          ([callId, call]) => {
-            if (
-              !call ||
-              call.calleeId !==
-                currentUser.uid ||
-              call.status !==
-                "ringing"
-            ) {
-              return;
+        Object.entries(calls)
+          .forEach(
+            ([callId, call]) => {
+
+              if (
+                !call ||
+                call.calleeId !==
+                currentUser?.uid
+              ) {
+                return;
+              }
+
+              if (
+                call.status !== "ringing"
+              ) {
+                return;
+              }
+
+              if (
+                currentCallId ||
+                pendingIncomingCall
+              ) {
+                return;
+              }
+
+              console.log(
+                "INCOMING CALL:",
+                call
+              );
+
+              pendingIncomingCall = {
+                ...call,
+                callId
+              };
+
+              currentCallId = callId;
+
+              currentCallRole = "callee";
+
+              currentRemoteUser = {
+                uid: call.callerId,
+                name:
+                  call.callerName ||
+                  call.callerEmail ||
+                  "User",
+                email:
+                  call.callerEmail ||
+                  ""
+              };
+
+              showIncomingCall(
+                currentRemoteUser
+              );
+
+              startRingtone();
+
+              listenForCallChanges(
+                callId,
+                "callee"
+              );
             }
+          );
 
-            if (
-              currentCallId ||
-              pendingIncomingCall
-            ) {
-              return;
-            }
-
-            pendingIncomingCall = {
-              callId,
-              ...call
-            };
-
-            currentCallId =
-              callId;
-
-            currentCallRole =
-              "callee";
-
-            currentRemoteUser = {
-              uid:
-                call.callerId ||
-                "",
-
-              name:
-                call.callerName ||
-                call.callerEmail ||
-                "User",
-
-              email:
-                call.callerEmail ||
-                ""
-            };
-
-            showIncomingCall(call);
-
-            sendBrowserNotification(
-              "Incoming voice call",
-              `${currentRemoteUser.name} is calling you.`
-            );
-
-            startRingtone();
-
-            listenForActiveCallChanges(
-              callId
-            );
-          }
-        );
       },
+
       error => {
+
         console.error(
           "INCOMING CALL LISTENER ERROR:",
           error
@@ -1060,197 +1362,146 @@ function listenForIncomingCalls() {
 
 
 // ============================================================
-// SHOW INCOMING CALL
-// ============================================================
-
-function showIncomingCall(call) {
-  const overlay =
-    $("incomingCallOverlay");
-
-  const avatar =
-    $("incomingCallerAvatar");
-
-  const name =
-    $("incomingCallerName");
-
-  const callerName =
-    call.callerName ||
-    call.callerEmail ||
-    "User";
-
-  if (avatar) {
-    avatar.src =
-      makeAvatar(callerName);
-
-    avatar.alt =
-      callerName;
-  }
-
-  if (name) {
-    name.textContent =
-      callerName;
-  }
-
-  $("ringingIndicator")
-    ?.classList.remove(
-      "hidden"
-    );
-
-  overlay?.classList.remove(
-    "hidden"
-  );
-}
-
-
-// ============================================================
 // ACCEPT CALL
 // ============================================================
 
 $("acceptCallBtn")?.addEventListener(
   "click",
-  acceptCall
+  acceptIncomingCall
 );
 
 
-async function acceptCall() {
+async function acceptIncomingCall() {
+
   if (
     !pendingIncomingCall ||
-    !currentCallId
+    !currentUser
   ) {
     return;
   }
 
-  const callId =
-    currentCallId;
+  const call =
+    pendingIncomingCall;
 
   try {
+
     stopRingtone();
 
-    const snapshot =
-      await get(
-        ref(
-          db,
-          `calls/${callId}`
-        )
-      );
+    hideIncomingCall();
 
-    if (!snapshot.exists()) {
-      await cleanupCall(false);
-      return;
-    }
+    localStream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false
+      });
 
-    const call =
-      snapshot.val();
+    peerConnection =
+      createPeerConnection();
 
-    if (call.status !== "ringing") {
-      showNotification(
-        "This call is no longer available."
-      );
+    localStream
+      .getTracks()
+      .forEach(track => {
 
-      await cleanupCall(false);
-      return;
-    }
+        peerConnection.addTrack(
+          track,
+          localStream
+        );
 
-    currentCallRole =
-      "callee";
+      });
 
-    currentRemoteUser = {
-      uid:
-        call.callerId ||
-        "",
+    remoteDescriptionSet = false;
 
-      name:
-        call.callerName ||
-        call.callerEmail ||
-        "User",
-
-      email:
-        call.callerEmail ||
-        ""
-    };
-
-    await startLocalAudio();
-
-    createPeerConnection();
-
-    if (call.offer) {
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(
-          call.offer
-        )
-      );
-
-      await addPendingRemoteCandidates();
-
-      const answer =
-        await peerConnection.createAnswer();
-
-      await peerConnection.setLocalDescription(
-        answer
-      );
-
-      await update(
-        ref(
-          db,
-          `calls/${callId}`
-        ),
-        {
-          answer: {
-            type:
-              answer.type,
-
-            sdp:
-              answer.sdp
-          },
-
-          status:
-            "accepted",
-
-          acceptedAt:
-            Date.now()
-        }
-      );
-    }
-
-    listenForCallerCandidates(
-      callId
+    await peerConnection.setRemoteDescription(
+      new RTCSessionDescription(
+        call.offer
+      )
     );
 
-    listenForActiveCallChanges(
-      callId
+    remoteDescriptionSet = true;
+
+    await flushPendingCandidates();
+
+    const answer =
+      await peerConnection.createAnswer();
+
+    await peerConnection.setLocalDescription(
+      answer
     );
 
-    showActiveCall();
+    await update(
+      ref(db, `calls/${call.callId}`),
+      {
+        status: "accepted",
+
+        answer: {
+          type: answer.type,
+          sdp: answer.sdp
+        },
+
+        acceptedAt: Date.now()
+      }
+    );
+
+    listenForIceCandidates(
+      call.callId,
+      "caller"
+    );
+
+    showActiveCall(
+      currentRemoteUser
+    );
 
     updateCallStatus(
       "Connecting..."
     );
 
+    saveMyHistory(
+      call.callId,
+      "accepted",
+      0,
+      call
+    );
+
+    console.log(
+      "CALL ACCEPTED:",
+      call.callId
+    );
+
   } catch (error) {
+
     console.error(
       "ACCEPT CALL ERROR:",
       error
     );
 
     showNotification(
-      "Could not answer the call."
+      "Could not answer the call: " +
+      error.message
     );
 
-    try {
-      await update(
-        ref(
-          db,
-          `calls/${callId}`
-        ),
-        {
-          status:
-            "failed",
+    if (call.callId) {
 
-          endedAt:
-            Date.now()
-        }
-      );
-    } catch (_) {}
+      try {
+
+        await update(
+          ref(
+            db,
+            `calls/${call.callId}`
+          ),
+          {
+            status: "failed",
+            endedAt: Date.now()
+          }
+        );
+
+      } catch (updateError) {
+
+        console.error(
+          "FAILED CALL UPDATE:",
+          updateError
+        );
+      }
+    }
 
     await cleanupCall(false);
   }
@@ -1263,58 +1514,43 @@ async function acceptCall() {
 
 $("rejectCallBtn")?.addEventListener(
   "click",
-  rejectCall
+  rejectIncomingCall
 );
 
 
-async function rejectCall() {
-  if (!currentCallId) {
+async function rejectIncomingCall() {
+
+  const call =
+    pendingIncomingCall;
+
+  if (!call) {
     return;
   }
 
-  const callId =
-    currentCallId;
-
-  let call = null;
+  stopRingtone();
 
   try {
-    stopRingtone();
-
-    const snapshot =
-      await get(
-        ref(
-          db,
-          `calls/${callId}`
-        )
-      );
-
-    if (snapshot.exists()) {
-      call =
-        snapshot.val();
-    }
 
     await update(
       ref(
         db,
-        `calls/${callId}`
+        `calls/${call.callId}`
       ),
       {
-        status:
-          "rejected",
-
-        endedAt:
-          Date.now()
+        status: "rejected",
+        endedAt: Date.now()
       }
     );
 
     await saveMyHistory(
-      callId,
+      call.callId,
       "rejected",
       0,
       call
     );
 
   } catch (error) {
+
     console.error(
       "REJECT CALL ERROR:",
       error
@@ -1326,787 +1562,7 @@ async function rejectCall() {
 
 
 // ============================================================
-// START CALL
-// ============================================================
-
-async function startCall(user) {
-  if (
-    !currentUser ||
-    !user ||
-    !user.uid
-  ) {
-    return;
-  }
-
-  if (currentCallId) {
-    showNotification(
-      "You are already in a call."
-    );
-
-    return;
-  }
-
-  try {
-    await startLocalAudio();
-
-    const callRef =
-      push(ref(db, "calls"));
-
-    const callId =
-      callRef.key;
-
-    if (!callId) {
-      throw new Error(
-        "Could not create call ID."
-      );
-    }
-
-    currentCallId =
-      callId;
-
-    currentCallRole =
-      "caller";
-
-    currentRemoteUser = {
-      uid:
-        user.uid,
-
-      name:
-        user.name ||
-        user.email ||
-        "User",
-
-      email:
-        user.email ||
-        ""
-    };
-
-    createPeerConnection();
-
-    const offer =
-      await peerConnection.createOffer({
-        offerToReceiveAudio: true
-      });
-
-    await peerConnection.setLocalDescription(
-      offer
-    );
-
-    const callData = {
-      callerId:
-        currentUser.uid,
-
-      callerName:
-        currentUser.displayName ||
-        currentUser.email ||
-        "User",
-
-      callerEmail:
-        currentUser.email ||
-        "",
-
-      calleeId:
-        user.uid,
-
-      calleeName:
-        user.name ||
-        user.email ||
-        "User",
-
-      calleeEmail:
-        user.email ||
-        "",
-
-      type:
-        "voice",
-
-      status:
-        "ringing",
-
-      offer: {
-        type:
-          offer.type,
-
-        sdp:
-          offer.sdp
-      },
-
-      createdAt:
-        Date.now()
-    };
-
-    await set(
-      callRef,
-      callData
-    );
-
-    showOutgoingCall(
-      user
-    );
-
-    listenForOutgoingCallChanges(
-      callId
-    );
-
-    listenForCalleeCandidates(
-      callId
-    );
-
-    listenForActiveCallChanges(
-      callId
-    );
-
-  } catch (error) {
-    console.error(
-      "START CALL ERROR:",
-      error
-    );
-
-    showNotification(
-      "Could not start the call."
-    );
-
-    if (currentCallId) {
-      try {
-        await update(
-          ref(
-            db,
-            `calls/${currentCallId}`
-          ),
-          {
-            status:
-              "failed",
-
-            endedAt:
-              Date.now()
-          }
-        );
-      } catch (_) {}
-    }
-
-    await cleanupCall(false);
-  }
-}
-
-
-// ============================================================
-// START LOCAL AUDIO
-// ============================================================
-
-async function startLocalAudio() {
-  if (localStream) {
-    return localStream;
-  }
-
-  try {
-    localStream =
-      await navigator.mediaDevices.getUserMedia(
-        {
-          audio: true,
-          video: false
-        }
-      );
-
-    return localStream;
-
-  } catch (error) {
-    console.error(
-      "MICROPHONE ERROR:",
-      error
-    );
-
-    showNotification(
-      "Microphone permission is required."
-    );
-
-    throw error;
-  }
-}
-
-
-// ============================================================
-// CREATE PEER CONNECTION
-// ============================================================
-
-function createPeerConnection() {
-  if (peerConnection) {
-    try {
-      peerConnection.close();
-    } catch (_) {}
-  }
-
-  peerConnection =
-    new RTCPeerConnection(
-      rtcConfig
-    );
-
-  if (localStream) {
-    localStream
-      .getTracks()
-      .forEach(track => {
-        peerConnection.addTrack(
-          track,
-          localStream
-        );
-      });
-  }
-
-  peerConnection.ontrack =
-    event => {
-      const remoteAudio =
-        $("remoteAudio");
-
-      if (!remoteAudio) {
-        return;
-      }
-
-      if (
-        event.streams &&
-        event.streams[0]
-      ) {
-        remoteAudio.srcObject =
-          event.streams[0];
-
-        remoteAudio.muted =
-          !isSpeakerOn;
-
-        remoteAudio.play()
-          .catch(error => {
-            console.warn(
-              "Remote audio autoplay blocked:",
-              error
-            );
-          });
-      }
-    };
-
-  peerConnection.onconnectionstatechange =
-    () => {
-      if (!peerConnection) {
-        return;
-      }
-
-      const state =
-        peerConnection.connectionState;
-
-      console.log(
-        "WEBRTC CONNECTION STATE:",
-        state
-      );
-
-      if (state === "connected") {
-        updateCallStatus(
-          "Connected"
-        );
-
-        if (!callStartTime) {
-          startCallTimer();
-        }
-      }
-
-      if (state === "connecting") {
-        updateCallStatus(
-          "Connecting..."
-        );
-      }
-
-      if (state === "disconnected") {
-        updateCallStatus(
-          "Connection interrupted"
-        );
-      }
-
-      if (state === "failed") {
-        updateCallStatus(
-          "Call failed"
-        );
-      }
-    };
-
-  peerConnection.oniceconnectionstatechange =
-    () => {
-      console.log(
-        "ICE STATE:",
-        peerConnection?.iceConnectionState
-      );
-    };
-
-  peerConnection.onicecandidate =
-    async event => {
-      if (
-        !event.candidate ||
-        !currentCallId ||
-        !currentUser
-      ) {
-        return;
-      }
-
-      try {
-        const candidateRef =
-          push(
-            ref(
-              db,
-              `calls/${currentCallId}/${
-                currentCallRole === "caller"
-                  ? "callerCandidates"
-                  : "calleeCandidates"
-              }`
-            )
-          );
-
-        await set(
-          candidateRef,
-          event.candidate.toJSON()
-        );
-
-      } catch (error) {
-        console.error(
-          "ICE CANDIDATE SAVE ERROR:",
-          error
-        );
-      }
-    };
-}
-
-
-// ============================================================
-// LISTEN FOR CALLEE CANDIDATES
-// ============================================================
-
-function listenForCalleeCandidates(
-  callId
-) {
-  const candidatesRef =
-    ref(
-      db,
-      `calls/${callId}/calleeCandidates`
-    );
-
-  const unsubscribe =
-    onChildAdded(
-      candidatesRef,
-      async snapshot => {
-        const candidate =
-          snapshot.val();
-
-        if (!candidate) {
-          return;
-        }
-
-        if (
-          peerConnection &&
-          peerConnection.remoteDescription
-        ) {
-          try {
-            await peerConnection.addIceCandidate(
-              new RTCIceCandidate(
-                candidate
-              )
-            );
-          } catch (error) {
-            console.warn(
-              "CALLEE ICE ERROR:",
-              error
-            );
-          }
-        } else {
-          pendingRemoteCandidates.push(
-            candidate
-          );
-        }
-      }
-    );
-
-  callUnsubscribers.push(
-    unsubscribe
-  );
-}
-
-
-// ============================================================
-// LISTEN FOR CALLER CANDIDATES
-// ============================================================
-
-function listenForCallerCandidates(
-  callId
-) {
-  const candidatesRef =
-    ref(
-      db,
-      `calls/${callId}/callerCandidates`
-    );
-
-  const unsubscribe =
-    onChildAdded(
-      candidatesRef,
-      async snapshot => {
-        const candidate =
-          snapshot.val();
-
-        if (!candidate) {
-          return;
-        }
-
-        if (
-          peerConnection &&
-          peerConnection.remoteDescription
-        ) {
-          try {
-            await peerConnection.addIceCandidate(
-              new RTCIceCandidate(
-                candidate
-              )
-            );
-          } catch (error) {
-            console.warn(
-              "CALLER ICE ERROR:",
-              error
-            );
-          }
-        } else {
-          pendingRemoteCandidates.push(
-            candidate
-          );
-        }
-      }
-    );
-
-  callUnsubscribers.push(
-    unsubscribe
-  );
-}
-
-
-// ============================================================
-// ADD PENDING REMOTE CANDIDATES
-// ============================================================
-
-async function addPendingRemoteCandidates() {
-  if (
-    !peerConnection ||
-    !peerConnection.remoteDescription
-  ) {
-    return;
-  }
-
-  const candidates =
-    [...pendingRemoteCandidates];
-
-  pendingRemoteCandidates =
-    [];
-
-  for (
-    const candidate of candidates
-  ) {
-    try {
-      await peerConnection.addIceCandidate(
-        new RTCIceCandidate(
-          candidate
-        )
-      );
-    } catch (error) {
-      console.warn(
-        "PENDING ICE ERROR:",
-        error
-      );
-    }
-  }
-}
-
-
-// ============================================================
-// OUTGOING CALL LISTENER
-// ============================================================
-
-function listenForOutgoingCallChanges(
-  callId
-) {
-  const callRef =
-    ref(
-      db,
-      `calls/${callId}`
-    );
-
-  const unsubscribe =
-    onValue(
-      callRef,
-      async snapshot => {
-        if (!snapshot.exists()) {
-          return;
-        }
-
-        const call =
-          snapshot.val();
-
-        if (
-          call.status ===
-          "rejected"
-        ) {
-          showNotification(
-            "Your call was rejected."
-          );
-
-          await saveMyHistory(
-            callId,
-            "rejected",
-            0,
-            call
-          );
-
-          await cleanupCall(
-            false
-          );
-
-          return;
-        }
-
-        if (
-          call.status ===
-          "cancelled"
-        ) {
-          await cleanupCall(
-            false
-          );
-
-          return;
-        }
-
-        if (
-          call.status ===
-          "failed"
-        ) {
-          showNotification(
-            "The call failed."
-          );
-
-          await saveMyHistory(
-            callId,
-            "failed",
-            0,
-            call
-          );
-
-          await cleanupCall(
-            false
-          );
-
-          return;
-        }
-
-        if (
-          call.status ===
-            "accepted" &&
-          call.answer &&
-          peerConnection &&
-          !peerConnection.remoteDescription
-        ) {
-          try {
-            await peerConnection.setRemoteDescription(
-              new RTCSessionDescription(
-                call.answer
-              )
-            );
-
-            await addPendingRemoteCandidates();
-
-            showActiveCall();
-
-            updateCallStatus(
-              "Connected"
-            );
-
-            if (!callStartTime) {
-              startCallTimer();
-            }
-
-          } catch (error) {
-            console.error(
-              "SET ANSWER ERROR:",
-              error
-            );
-          }
-        }
-
-        if (
-          call.status ===
-          "ended"
-        ) {
-          await saveMyHistory(
-            callId,
-            "ended",
-            getCallDuration(),
-            call
-          );
-
-          await cleanupCall(
-            false
-          );
-        }
-      },
-      error => {
-        console.error(
-          "OUTGOING CALL LISTENER ERROR:",
-          error
-        );
-      }
-    );
-
-  callUnsubscribers.push(
-    unsubscribe
-  );
-}
-
-
-// ============================================================
-// ACTIVE CALL LISTENER
-// ============================================================
-
-function listenForActiveCallChanges(
-  callId
-) {
-  const callRef =
-    ref(
-      db,
-      `calls/${callId}`
-    );
-
-  const unsubscribe =
-    onValue(
-      callRef,
-      async snapshot => {
-        if (!snapshot.exists()) {
-          return;
-        }
-
-        const call =
-          snapshot.val();
-
-        if (
-          call.status ===
-          "cancelled"
-        ) {
-          if (
-            currentCallRole ===
-            "callee"
-          ) {
-            showNotification(
-              "The caller cancelled the call."
-            );
-          }
-
-          await saveMyHistory(
-            callId,
-            "cancelled",
-            getCallDuration(),
-            call
-          );
-
-          await cleanupCall(
-            false
-          );
-
-          return;
-        }
-
-        if (
-          call.status ===
-          "ended"
-        ) {
-          await saveMyHistory(
-            callId,
-            "ended",
-            getCallDuration(),
-            call
-          );
-
-          await cleanupCall(
-            false
-          );
-
-          return;
-        }
-
-        if (
-          call.status ===
-          "failed"
-        ) {
-          await saveMyHistory(
-            callId,
-            "failed",
-            getCallDuration(),
-            call
-          );
-
-          await cleanupCall(
-            false
-          );
-        }
-      },
-      error => {
-        console.error(
-          "ACTIVE CALL LISTENER ERROR:",
-          error
-        );
-      }
-    );
-
-  callUnsubscribers.push(
-    unsubscribe
-  );
-}
-
-
-// ============================================================
-// SHOW OUTGOING CALL
-// ============================================================
-
-function showOutgoingCall(user) {
-  const overlay =
-    $("outgoingCallOverlay");
-
-  const avatar =
-    $("outgoingCallerAvatar");
-
-  const name =
-    $("outgoingCallerName");
-
-  const status =
-    $("outgoingCallStatus");
-
-  if (avatar) {
-    avatar.src =
-      makeAvatar(
-        user.name ||
-        user.email ||
-        "User"
-      );
-  }
-
-  if (name) {
-    name.textContent =
-      user.name ||
-      user.email ||
-      "User";
-  }
-
-  if (status) {
-    status.textContent =
-      "Calling...";
-  }
-
-  $("outgoingRinging")
-    ?.classList.remove(
-      "hidden"
-    );
-
-  overlay?.classList.remove(
-    "hidden"
-  );
-}
-
-
-// ============================================================
-// CANCEL OUTGOING CALL BUTTON
+// CANCEL OUTGOING CALL
 // ============================================================
 
 $("cancelCallBtn")?.addEventListener(
@@ -2115,11 +1571,8 @@ $("cancelCallBtn")?.addEventListener(
 );
 
 
-// ============================================================
-// CANCEL OUTGOING CALL
-// ============================================================
-
 async function cancelOutgoingCall() {
+
   if (!currentCallId) {
     return;
   }
@@ -2127,35 +1580,7 @@ async function cancelOutgoingCall() {
   const callId =
     currentCallId;
 
-  let call = null;
-
   try {
-    const beforeSnapshot =
-      await get(
-        ref(
-          db,
-          `calls/${callId}`
-        )
-      );
-
-    if (beforeSnapshot.exists()) {
-      call =
-        beforeSnapshot.val();
-    }
-
-    await update(
-      ref(
-        db,
-        `calls/${callId}`
-      ),
-      {
-        status:
-          "cancelled",
-
-        endedAt:
-          Date.now()
-      }
-    );
 
     const snapshot =
       await get(
@@ -2166,199 +1591,360 @@ async function cancelOutgoingCall() {
       );
 
     if (snapshot.exists()) {
-      call =
+
+      const call =
         snapshot.val();
+
+      await update(
+        ref(
+          db,
+          `calls/${callId}`
+        ),
+        {
+          status: "cancelled",
+          endedAt: Date.now()
+        }
+      );
+
+      await saveMyHistory(
+        callId,
+        "cancelled",
+        0,
+        call
+      );
     }
 
-    await saveMyHistory(
-      callId,
-      "cancelled",
-      0,
-      call
-    );
-
   } catch (error) {
+
     console.error(
       "CANCEL CALL ERROR:",
       error
     );
   }
 
-  stopRingtone();
+  await cleanupCall(false);
+}
 
-  await cleanupCall(
-    false
+
+// ============================================================
+// ICE CANDIDATES
+// ============================================================
+
+function listenForIceCandidates(
+  callId,
+  remoteSide
+) {
+
+  const candidatesRef =
+    ref(
+      db,
+      `calls/${callId}/candidates/${remoteSide}`
+    );
+
+  const unsubscribe =
+    onChildAdded(
+      candidatesRef,
+      async snapshot => {
+
+        const candidate =
+          snapshot.val();
+
+        if (!candidate) {
+          return;
+        }
+
+        try {
+
+          const iceCandidate =
+            new RTCIceCandidate(
+              candidate
+            );
+
+          if (
+            peerConnection &&
+            remoteDescriptionSet
+          ) {
+
+            await peerConnection.addIceCandidate(
+              iceCandidate
+            );
+
+          } else {
+
+            pendingRemoteCandidates.push(
+              iceCandidate
+            );
+          }
+
+        } catch (error) {
+
+          console.error(
+            "ADD ICE CANDIDATE ERROR:",
+            error
+          );
+        }
+      },
+      error => {
+
+        console.error(
+          "ICE LISTENER ERROR:",
+          error
+        );
+      }
+    );
+
+  callUnsubscribers.push(
+    unsubscribe
   );
 }
 
 
 // ============================================================
-// SHOW ACTIVE CALL
+// FLUSH ICE CANDIDATES
 // ============================================================
 
-function showActiveCall() {
-  $("outgoingCallOverlay")
-    ?.classList.add(
-      "hidden"
-    );
+async function flushPendingCandidates() {
 
-  $("incomingCallOverlay")
-    ?.classList.add(
-      "hidden"
-    );
-
-  const overlay =
-    $("callOverlay");
-
-  const avatar =
-    $("callAvatar");
-
-  const callType =
-    $("callType");
-
-  const name =
-    $("callName");
-
-  const status =
-    $("callStatus");
-
-  const timer =
-    $("callTimer");
-
-  const remoteName =
-    currentRemoteUser?.name ||
-    currentRemoteUser?.email ||
-    "User";
-
-  if (avatar) {
-    avatar.src =
-      makeAvatar(
-        remoteName
-      );
-
-    avatar.alt =
-      remoteName;
+  if (
+    !peerConnection ||
+    !remoteDescriptionSet
+  ) {
+    return;
   }
 
-  if (callType) {
-    callType.textContent =
+  const candidates =
+    [...pendingRemoteCandidates];
+
+  pendingRemoteCandidates = [];
+
+  for (
+    const candidate of candidates
+  ) {
+
+    try {
+
+      await peerConnection.addIceCandidate(
+        candidate
+      );
+
+    } catch (error) {
+
+      console.error(
+        "FLUSH ICE ERROR:",
+        error
+      );
+    }
+  }
+}
+
+
+// ============================================================
+// OUTGOING CALL UI
+// ============================================================
+
+function showOutgoingCall(user) {
+
+  $("outgoingCallOverlay")
+    ?.classList.remove("hidden");
+
+  if ($("outgoingCallerAvatar")) {
+
+    $("outgoingCallerAvatar").src =
+      makeAvatar(
+        user?.name ||
+        user?.email ||
+        "User"
+      );
+  }
+
+  if ($("outgoingCallerName")) {
+
+    $("outgoingCallerName")
+      .textContent =
+      user?.name ||
+      user?.email ||
+      "User";
+  }
+
+  if ($("outgoingCallStatus")) {
+
+    $("outgoingCallStatus")
+      .textContent =
+      "Calling...";
+  }
+
+  if ($("outgoingRinging")) {
+
+    $("outgoingRinging")
+      .textContent =
+      "🔔 Ringing...";
+  }
+}
+
+
+function hideOutgoingCall() {
+
+  $("outgoingCallOverlay")
+    ?.classList.add("hidden");
+}
+
+
+// ============================================================
+// INCOMING CALL UI
+// ============================================================
+
+function showIncomingCall(user) {
+
+  $("incomingCallOverlay")
+    ?.classList.remove("hidden");
+
+  if ($("incomingCallerAvatar")) {
+
+    $("incomingCallerAvatar").src =
+      makeAvatar(
+        user?.name ||
+        user?.email ||
+        "User"
+      );
+  }
+
+  if ($("incomingCallerName")) {
+
+    $("incomingCallerName")
+      .textContent =
+      user?.name ||
+      user?.email ||
+      "User";
+  }
+
+  if ($("ringingIndicator")) {
+
+    $("ringingIndicator")
+      .textContent =
+      "Someone is calling you...";
+  }
+}
+
+
+function hideIncomingCall() {
+
+  $("incomingCallOverlay")
+    ?.classList.add("hidden");
+}
+
+
+// ============================================================
+// ACTIVE CALL UI
+// ============================================================
+
+function showActiveCall(user) {
+
+  $("callOverlay")
+    ?.classList.remove("hidden");
+
+  if ($("callAvatar")) {
+
+    $("callAvatar").src =
+      makeAvatar(
+        user?.name ||
+        user?.email ||
+        "User"
+      );
+  }
+
+  if ($("callName")) {
+
+    $("callName")
+      .textContent =
+      user?.name ||
+      user?.email ||
+      "User";
+  }
+
+  if ($("callType")) {
+
+    $("callType")
+      .textContent =
       "Voice Call";
   }
 
-  if (name) {
-    name.textContent =
-      remoteName;
-  }
-
-  if (status) {
-    status.textContent =
-      "Connecting...";
-  }
-
-  if (timer) {
-    timer.textContent =
-      "00:00";
-  }
-
-  overlay?.classList.remove(
-    "hidden"
+  updateCallStatus(
+    "Connecting..."
   );
 }
 
 
-// ============================================================
-// CALL STATUS UI
-// ============================================================
+function updateCallStatus(status) {
 
-function updateCallStatus(text) {
-  const status =
-    $("callStatus");
+  if ($("callStatus")) {
 
-  if (status) {
-    status.textContent =
-      text;
+    $("callStatus")
+      .textContent =
+      status;
   }
 }
 
 
 // ============================================================
-// TIMER
+// CALL TIMER
 // ============================================================
 
 function startCallTimer() {
-  stopCallTimer();
+
+  if (callStartTime) {
+    return;
+  }
 
   callStartTime =
     Date.now();
 
-  const timer =
-    $("callTimer");
+  updateCallTimer();
 
   callTimerInterval =
     setInterval(
-      () => {
-        const elapsed =
-          Math.floor(
-            (
-              Date.now() -
-              callStartTime
-            ) / 1000
-          );
-
-        const minutes =
-          Math.floor(
-            elapsed / 60
-          );
-
-        const seconds =
-          elapsed % 60;
-
-        if (timer) {
-          timer.textContent =
-            String(
-              minutes
-            ).padStart(
-              2,
-              "0"
-            ) +
-            ":" +
-            String(
-              seconds
-            ).padStart(
-              2,
-              "0"
-            );
-        }
-      },
+      updateCallTimer,
       1000
     );
 }
 
 
+function updateCallTimer() {
+
+  if (!$("callTimer")) {
+    return;
+  }
+
+  $("callTimer")
+    .textContent =
+    formatDuration(
+      getCallDuration()
+    );
+}
+
+
 function stopCallTimer() {
-  if (
-    callTimerInterval
-  ) {
+
+  if (callTimerInterval) {
+
     clearInterval(
       callTimerInterval
     );
 
-    callTimerInterval =
-      null;
+    callTimerInterval = null;
   }
 }
 
 
 function getCallDuration() {
+
   if (!callStartTime) {
     return 0;
   }
 
   return Math.floor(
-    (
-      Date.now() -
-      callStartTime
-    ) / 1000
+    (Date.now() -
+      callStartTime) /
+      1000
   );
 }
 
@@ -2370,6 +1956,7 @@ function getCallDuration() {
 $("muteBtn")?.addEventListener(
   "click",
   () => {
+
     if (!localStream) {
       return;
     }
@@ -2379,18 +1966,16 @@ $("muteBtn")?.addEventListener(
 
     localStream
       .getAudioTracks()
-      .forEach(
-        track => {
-          track.enabled =
-            !isMuted;
-        }
-      );
+      .forEach(track => {
 
-    const button =
-      $("muteBtn");
+        track.enabled =
+          !isMuted;
+      });
 
-    if (button) {
-      button.textContent =
+    if ($("muteBtn")) {
+
+      $("muteBtn")
+        .textContent =
         isMuted
           ? "🔇 Unmute"
           : "🎤 Mute";
@@ -2406,6 +1991,7 @@ $("muteBtn")?.addEventListener(
 $("speakerBtn")?.addEventListener(
   "click",
   () => {
+
     const audio =
       $("remoteAudio");
 
@@ -2419,11 +2005,10 @@ $("speakerBtn")?.addEventListener(
     audio.muted =
       !isSpeakerOn;
 
-    const button =
-      $("speakerBtn");
+    if ($("speakerBtn")) {
 
-    if (button) {
-      button.textContent =
+      $("speakerBtn")
+        .textContent =
         isSpeakerOn
           ? "🔊 Speaker"
           : "🔇 Speaker";
@@ -2433,7 +2018,7 @@ $("speakerBtn")?.addEventListener(
 
 
 // ============================================================
-// END CALL BUTTON
+// END CALL
 // ============================================================
 
 $("endCallBtn")?.addEventListener(
@@ -2442,13 +2027,12 @@ $("endCallBtn")?.addEventListener(
 );
 
 
-// ============================================================
-// END CALL
-// ============================================================
-
 async function endCall() {
+
   if (!currentCallId) {
+
     await cleanupCall(false);
+
     return;
   }
 
@@ -2458,32 +2042,6 @@ async function endCall() {
   let call = null;
 
   try {
-    const beforeSnapshot =
-      await get(
-        ref(
-          db,
-          `calls/${callId}`
-        )
-      );
-
-    if (beforeSnapshot.exists()) {
-      call =
-        beforeSnapshot.val();
-    }
-
-    await update(
-      ref(
-        db,
-        `calls/${callId}`
-      ),
-      {
-        status:
-          "ended",
-
-        endedAt:
-          Date.now()
-      }
-    );
 
     const snapshot =
       await get(
@@ -2494,9 +2052,21 @@ async function endCall() {
       );
 
     if (snapshot.exists()) {
+
       call =
         snapshot.val();
     }
+
+    await update(
+      ref(
+        db,
+        `calls/${callId}`
+      ),
+      {
+        status: "ended",
+        endedAt: Date.now()
+      }
+    );
 
     await saveMyHistory(
       callId,
@@ -2506,23 +2076,23 @@ async function endCall() {
     );
 
   } catch (error) {
+
     console.error(
       "END CALL ERROR:",
       error
     );
   }
 
-  await cleanupCall(
-    false
-  );
+  await cleanupCall(false);
 }
 
 
 // ============================================================
-// HISTORY - GET REMOTE USER
+// SAVE HISTORY
 // ============================================================
 
 function getRemoteUserFromCall(call) {
+
   if (
     !call ||
     !currentUser
@@ -2534,10 +2104,11 @@ function getRemoteUserFromCall(call) {
     call.callerId ===
     currentUser.uid
   ) {
+
     return {
+
       uid:
-        call.calleeId ||
-        "",
+        call.calleeId || "",
 
       name:
         call.calleeName ||
@@ -2545,8 +2116,7 @@ function getRemoteUserFromCall(call) {
         "User",
 
       email:
-        call.calleeEmail ||
-        ""
+        call.calleeEmail || ""
     };
   }
 
@@ -2554,10 +2124,11 @@ function getRemoteUserFromCall(call) {
     call.calleeId ===
     currentUser.uid
   ) {
+
     return {
+
       uid:
-        call.callerId ||
-        "",
+        call.callerId || "",
 
       name:
         call.callerName ||
@@ -2565,8 +2136,7 @@ function getRemoteUserFromCall(call) {
         "User",
 
       email:
-        call.callerEmail ||
-        ""
+        call.callerEmail || ""
     };
   }
 
@@ -2574,33 +2144,22 @@ function getRemoteUserFromCall(call) {
 }
 
 
-// ============================================================
-// SAVE CALL HISTORY
-// ============================================================
-
 async function saveMyHistory(
   callId,
   status,
   duration = 0,
   call = null
 ) {
-  if (!currentUser) {
-    console.warn(
-      "Cannot save history: no logged-in user."
-    );
 
-    return;
-  }
-
-  if (!callId) {
-    console.warn(
-      "Cannot save history: no call ID."
-    );
-
+  if (
+    !currentUser ||
+    !callId
+  ) {
     return;
   }
 
   try {
+
     const remote =
       getRemoteUserFromCall(
         call
@@ -2615,30 +2174,37 @@ async function saveMyHistory(
       );
 
     const historyData = {
-      callId,
+
+      callId:
+
+        callId,
 
       remoteUid:
-        remote.uid ||
-        "",
+
+        remote.uid || "",
 
       remoteName:
+
         remote.name ||
         remote.email ||
         "User",
 
       remoteEmail:
-        remote.email ||
-        "",
+
+        remote.email || "",
 
       status:
+
         status ||
         "ended",
 
       duration:
+
         Number(duration) ||
         0,
 
       timestamp:
+
         Date.now()
     };
 
@@ -2653,6 +2219,7 @@ async function saveMyHistory(
     );
 
   } catch (error) {
+
     console.error(
       "SAVE HISTORY ERROR:",
       error
@@ -2666,13 +2233,16 @@ async function saveMyHistory(
 // ============================================================
 
 function listenForHistory() {
+
   if (historyUnsubscribe) {
+
     try {
       historyUnsubscribe();
-    } catch (_) {}
+    } catch (error) {
+      console.warn(error);
+    }
 
-    historyUnsubscribe =
-      null;
+    historyUnsubscribe = null;
   }
 
   if (!currentUser) {
@@ -2686,23 +2256,43 @@ function listenForHistory() {
     );
 
   console.log(
-    "HISTORY LISTENER STARTED FOR:",
-    currentUser.uid
+    "HISTORY LISTENER STARTED:",
+    `callHistory/${currentUser.uid}`
   );
 
   historyUnsubscribe =
     onValue(
+
       historyRef,
+
       snapshot => {
+
+        console.log(
+          "HISTORY DATA RECEIVED:",
+          snapshot.exists(),
+          snapshot.val()
+        );
+
         renderHistory(
           snapshot
         );
       },
+
       error => {
+
         console.error(
           "HISTORY LISTENER ERROR:",
           error
         );
+
+        const container =
+          $("callHistoryList");
+
+        if (container) {
+
+          container.innerHTML =
+            `<p>Unable to load call history.</p>`;
+        }
       }
     );
 }
@@ -2713,19 +2303,23 @@ function listenForHistory() {
 // ============================================================
 
 function renderHistory(snapshot) {
+
   const container =
-    $("historyList") ||
-    $("callHistory") ||
-    $("history");
+    $("callHistoryList");
 
   if (!container) {
+
+    console.error(
+      "callHistoryList NOT FOUND"
+    );
+
     return;
   }
 
-  container.innerHTML =
-    "";
+  container.innerHTML = "";
 
   if (!snapshot.exists()) {
+
     container.innerHTML =
       "<p>No call history yet.</p>";
 
@@ -2736,9 +2330,7 @@ function renderHistory(snapshot) {
     snapshot.val();
 
   const entries =
-    Object.entries(
-      history
-    )
+    Object.entries(history)
       .map(
         ([id, item]) => ({
           id,
@@ -2751,123 +2343,140 @@ function renderHistory(snapshot) {
           (a.timestamp || 0)
       );
 
-  entries.forEach(
-    item => {
-      const name =
-        item.remoteName ||
-        item.remoteEmail ||
-        "User";
+  entries.forEach(item => {
 
-      const email =
-        item.remoteEmail ||
-        "";
+    const name =
+      item.remoteName ||
+      item.remoteEmail ||
+      "User";
 
-      const element =
-        document.createElement(
-          "div"
-        );
+    const email =
+      item.remoteEmail ||
+      "";
 
-      element.className =
-        "history-item";
+    const element =
+      document.createElement("div");
 
-      const avatar =
-        document.createElement(
-          "img"
-        );
+    element.className =
+      "history-item";
 
-      avatar.src =
-        makeAvatar(name);
 
-      avatar.alt =
-        name;
+    const avatar =
+      document.createElement("img");
 
-      const info =
-        document.createElement(
-          "div"
-        );
+    avatar.src =
+      makeAvatar(name);
 
-      info.className =
-        "history-info";
+    avatar.alt =
+      name;
 
-      const nameElement =
-        document.createElement(
-          "div"
-        );
 
-      nameElement.className =
-        "history-name";
+    const info =
+      document.createElement("div");
 
-      nameElement.textContent =
-        name;
+    info.className =
+      "history-info";
 
-      const emailElement =
-        document.createElement(
-          "div"
-        );
 
-      emailElement.className =
-        "history-email";
+    const nameElement =
+      document.createElement("div");
 
-      emailElement.textContent =
-        email;
+    nameElement.className =
+      "history-name";
 
-      const statusElement =
-        document.createElement(
-          "div"
-        );
+    nameElement.textContent =
+      name;
 
-      statusElement.className =
-        "history-status";
 
-      statusElement.textContent =
-        formatHistoryStatus(
-          item.status
-        );
+    const emailElement =
+      document.createElement("div");
 
-      const durationElement =
-        document.createElement(
-          "div"
-        );
+    emailElement.className =
+      "history-email";
 
-      durationElement.className =
-        "history-duration";
+    emailElement.textContent =
+      email;
 
-      durationElement.textContent =
-        formatDuration(
-          item.duration || 0
-        );
+
+    const statusElement =
+      document.createElement("div");
+
+    statusElement.className =
+      "history-status";
+
+    statusElement.textContent =
+      formatHistoryStatus(
+        item.status
+      );
+
+
+    const durationElement =
+      document.createElement("div");
+
+    durationElement.className =
+      "history-duration";
+
+    durationElement.textContent =
+      formatDuration(
+        item.duration || 0
+      );
+
+
+    const dateElement =
+      document.createElement("div");
+
+    dateElement.className =
+      "history-date";
+
+    if (item.timestamp) {
+
+      dateElement.textContent =
+        new Date(
+          item.timestamp
+        ).toLocaleString();
+    }
+
+
+    info.appendChild(
+      nameElement
+    );
+
+    if (email) {
 
       info.appendChild(
-        nameElement
-      );
-
-      if (email) {
-        info.appendChild(
-          emailElement
-        );
-      }
-
-      info.appendChild(
-        statusElement
-      );
-
-      info.appendChild(
-        durationElement
-      );
-
-      element.appendChild(
-        avatar
-      );
-
-      element.appendChild(
-        info
-      );
-
-      container.appendChild(
-        element
+        emailElement
       );
     }
-  );
+
+    info.appendChild(
+      statusElement
+    );
+
+    info.appendChild(
+      durationElement
+    );
+
+    if (item.timestamp) {
+
+      info.appendChild(
+        dateElement
+      );
+    }
+
+
+    element.appendChild(
+      avatar
+    );
+
+    element.appendChild(
+      info
+    );
+
+    container.appendChild(
+      element
+    );
+
+  });
 }
 
 
@@ -2875,10 +2484,10 @@ function renderHistory(snapshot) {
 // HISTORY STATUS
 // ============================================================
 
-function formatHistoryStatus(
-  status
-) {
+function formatHistoryStatus(status) {
+
   switch (status) {
+
     case "rejected":
       return "❌ Rejected";
 
@@ -2888,8 +2497,14 @@ function formatHistoryStatus(
     case "failed":
       return "⚠️ Failed";
 
+    case "accepted":
+      return "📞 Answered";
+
     case "ended":
       return "📞 Completed";
+
+    case "ringing":
+      return "📞 Calling";
 
     default:
       return "📞 Call";
@@ -2902,9 +2517,9 @@ function formatHistoryStatus(
 // ============================================================
 
 function formatDuration(seconds) {
+
   seconds =
-    Number(seconds) ||
-    0;
+    Number(seconds) || 0;
 
   const minutes =
     Math.floor(
@@ -2915,19 +2530,11 @@ function formatDuration(seconds) {
     seconds % 60;
 
   return (
-    String(
-      minutes
-    ).padStart(
-      2,
-      "0"
-    ) +
+    String(minutes)
+      .padStart(2, "0") +
     ":" +
-    String(
-      remaining
-    ).padStart(
-      2,
-      "0"
-    )
+    String(remaining)
+      .padStart(2, "0")
   );
 }
 
@@ -2937,9 +2544,57 @@ function formatDuration(seconds) {
 // ============================================================
 
 function startRingtone() {
+
   stopRingtone();
 
+  const ringtone =
+    $("ringtone");
+
+  if (ringtone) {
+
+    try {
+
+      ringtone.currentTime =
+        0;
+
+      ringtone.loop =
+        true;
+
+      const promise =
+        ringtone.play();
+
+      if (
+        promise &&
+        typeof promise.catch ===
+        "function"
+      ) {
+
+        promise.catch(error => {
+
+          console.warn(
+            "RINGTONE PLAY BLOCKED:",
+            error
+          );
+
+        });
+      }
+
+      return;
+
+    } catch (error) {
+
+      console.warn(
+        "HTML RINGTONE ERROR:",
+        error
+      );
+    }
+  }
+
+
+  // Fallback generated tone
+
   try {
+
     const AudioContext =
       window.AudioContext ||
       window.webkitAudioContext;
@@ -2951,60 +2606,55 @@ function startRingtone() {
     ringtoneContext =
       new AudioContext();
 
-    const playTone =
-      () => {
-        if (!ringtoneContext) {
-          return;
-        }
 
-        const oscillator =
-          ringtoneContext
-            .createOscillator();
+    const playTone = () => {
 
-        const gain =
-          ringtoneContext
-            .createGain();
+      if (!ringtoneContext) {
+        return;
+      }
 
-        oscillator.type =
-          "sine";
+      const oscillator =
+        ringtoneContext
+          .createOscillator();
 
-        oscillator.frequency.value =
-          700;
+      const gain =
+        ringtoneContext
+          .createGain();
 
-        gain.gain.setValueAtTime(
-          0.0001,
-          ringtoneContext.currentTime
-        );
+      oscillator.type =
+        "sine";
 
-        gain.gain
-          .exponentialRampToValueAtTime(
-            0.15,
-            ringtoneContext.currentTime +
-              0.03
-          );
+      oscillator.frequency.value =
+        700;
 
-        gain.gain
-          .exponentialRampToValueAtTime(
-            0.0001,
-            ringtoneContext.currentTime +
-              0.5
-          );
+      gain.gain.setValueAtTime(
+        0.0001,
+        ringtoneContext.currentTime
+      );
 
-        oscillator.connect(
-          gain
-        );
+      gain.gain.exponentialRampToValueAtTime(
+        0.15,
+        ringtoneContext.currentTime + 0.03
+      );
 
-        gain.connect(
-          ringtoneContext.destination
-        );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        ringtoneContext.currentTime + 0.5
+      );
 
-        oscillator.start();
+      oscillator.connect(gain);
 
-        oscillator.stop(
-          ringtoneContext.currentTime +
-            0.5
-        );
-      };
+      gain.connect(
+        ringtoneContext.destination
+      );
+
+      oscillator.start();
+
+      oscillator.stop(
+        ringtoneContext.currentTime + 0.5
+      );
+    };
+
 
     playTone();
 
@@ -3015,6 +2665,7 @@ function startRingtone() {
       );
 
   } catch (error) {
+
     console.warn(
       "RINGTONE ERROR:",
       error
@@ -3028,100 +2679,55 @@ function startRingtone() {
 // ============================================================
 
 function stopRingtone() {
+
+  const ringtone =
+    $("ringtone");
+
+  if (ringtone) {
+
+    try {
+
+      ringtone.pause();
+
+      ringtone.currentTime =
+        0;
+
+    } catch (error) {
+
+      console.warn(
+        "RINGTONE STOP ERROR:",
+        error
+      );
+    }
+  }
+
+
   if (ringtoneTimer) {
+
     clearInterval(
       ringtoneTimer
     );
 
-    ringtoneTimer =
-      null;
+    ringtoneTimer = null;
   }
 
+
   if (ringtoneContext) {
+
     try {
+
       ringtoneContext.close();
+
     } catch (error) {
+
       console.warn(
-        "Could not close ringtone:",
+        "RINGTONE CONTEXT ERROR:",
         error
       );
     }
 
-    ringtoneContext =
-      null;
+    ringtoneContext = null;
   }
-}
-
-
-// ============================================================
-// HIDE ALL CALL OVERLAYS
-// ============================================================
-
-function hideAllCallOverlays() {
-  $("incomingCallOverlay")
-    ?.classList.add(
-      "hidden"
-    );
-
-  $("outgoingCallOverlay")
-    ?.classList.add(
-      "hidden"
-    );
-
-  $("callOverlay")
-    ?.classList.add(
-      "hidden"
-    );
-}
-
-
-// ============================================================
-// STOP ALL LISTENERS
-// ============================================================
-
-function stopAllListeners() {
-  if (usersUnsubscribe) {
-    try {
-      usersUnsubscribe();
-    } catch (_) {}
-
-    usersUnsubscribe =
-      null;
-  }
-
-  if (incomingCallsUnsubscribe) {
-    try {
-      incomingCallsUnsubscribe();
-    } catch (_) {}
-
-    incomingCallsUnsubscribe =
-      null;
-  }
-
-  if (historyUnsubscribe) {
-    try {
-      historyUnsubscribe();
-    } catch (_) {}
-
-    historyUnsubscribe =
-      null;
-  }
-
-  callUnsubscribers.forEach(
-    unsubscribe => {
-      try {
-        unsubscribe();
-      } catch (error) {
-        console.warn(
-          "Listener cleanup error:",
-          error
-        );
-      }
-    }
-  );
-
-  callUnsubscribers =
-    [];
 }
 
 
@@ -3132,6 +2738,7 @@ function stopAllListeners() {
 async function cleanupCall(
   updateDatabase = false
 ) {
+
   const callId =
     currentCallId;
 
@@ -3139,25 +2746,27 @@ async function cleanupCall(
 
   stopCallTimer();
 
+
   if (
     updateDatabase &&
     callId
   ) {
+
     try {
+
       await update(
         ref(
           db,
           `calls/${callId}`
         ),
         {
-          status:
-            "ended",
-
-          endedAt:
-            Date.now()
+          status: "ended",
+          endedAt: Date.now()
         }
       );
+
     } catch (error) {
+
       console.error(
         "CLEANUP DATABASE ERROR:",
         error
@@ -3165,66 +2774,81 @@ async function cleanupCall(
     }
   }
 
-  callUnsubscribers.forEach(
-    unsubscribe => {
-      try {
-        unsubscribe();
-      } catch (error) {
-        console.warn(
-          "CALL LISTENER CLEANUP ERROR:",
-          error
-        );
-      }
-    }
-  );
 
-  callUnsubscribers =
-    [];
+  callUnsubscribers
+    .forEach(
+      unsubscribe => {
+
+        try {
+
+          unsubscribe();
+
+        } catch (error) {
+
+          console.warn(
+            "CALL LISTENER CLEANUP ERROR:",
+            error
+          );
+        }
+      }
+    );
+
+  callUnsubscribers = [];
+
 
   if (localStream) {
+
     localStream
       .getTracks()
-      .forEach(
-        track => {
-          try {
-            track.stop();
-          } catch (error) {
-            console.warn(
-              "TRACK STOP ERROR:",
-              error
-            );
-          }
-        }
-      );
+      .forEach(track => {
 
-    localStream =
-      null;
+        try {
+
+          track.stop();
+
+        } catch (error) {
+
+          console.warn(
+            "TRACK STOP ERROR:",
+            error
+          );
+        }
+      });
+
+    localStream = null;
   }
 
+
   if (peerConnection) {
+
     try {
+
       peerConnection.close();
+
     } catch (error) {
+
       console.warn(
-        "PEER CONNECTION CLOSE ERROR:",
+        "PEER CLOSE ERROR:",
         error
       );
     }
 
-    peerConnection =
-      null;
+    peerConnection = null;
   }
+
 
   const remoteAudio =
     $("remoteAudio");
 
   if (remoteAudio) {
+
     remoteAudio.srcObject =
       null;
 
     remoteAudio.muted =
       false;
   }
+
 
   currentCallId =
     null;
@@ -3241,6 +2865,9 @@ async function cleanupCall(
   pendingRemoteCandidates =
     [];
 
+  remoteDescriptionSet =
+    false;
+
   callStartTime =
     null;
 
@@ -3250,125 +2877,450 @@ async function cleanupCall(
   isSpeakerOn =
     true;
 
-  const muteBtn =
-    $("muteBtn");
 
-  if (muteBtn) {
-    muteBtn.textContent =
+  if ($("muteBtn")) {
+
+    $("muteBtn")
+      .textContent =
       "🎤 Mute";
   }
 
-  const speakerBtn =
-    $("speakerBtn");
+  if ($("speakerBtn")) {
 
-  if (speakerBtn) {
-    speakerBtn.textContent =
+    $("speakerBtn")
+      .textContent =
       "🔊 Speaker";
   }
+
 
   hideAllCallOverlays();
 }
 
 
 // ============================================================
-// PAGE CLOSE / REFRESH
+// HIDE ALL CALL OVERLAYS
+// ============================================================
+
+function hideAllCallOverlays() {
+
+  $("incomingCallOverlay")
+    ?.classList.add("hidden");
+
+  $("outgoingCallOverlay")
+    ?.classList.add("hidden");
+
+  $("callOverlay")
+    ?.classList.add("hidden");
+}
+
+
+// ============================================================
+// STOP ALL LISTENERS
+// ============================================================
+
+function stopAllListeners() {
+
+  if (usersUnsubscribe) {
+
+    try {
+      usersUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+
+    usersUnsubscribe = null;
+  }
+
+
+  if (incomingCallsUnsubscribe) {
+
+    try {
+      incomingCallsUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+
+    incomingCallsUnsubscribe =
+      null;
+  }
+
+
+  if (historyUnsubscribe) {
+
+    try {
+      historyUnsubscribe();
+    } catch (error) {
+      console.warn(error);
+    }
+
+    historyUnsubscribe =
+      null;
+  }
+
+
+  callUnsubscribers
+    .forEach(
+      unsubscribe => {
+
+        try {
+          unsubscribe();
+        } catch (error) {
+          console.warn(error);
+        }
+      }
+    );
+
+  callUnsubscribers = [];
+}
+
+
+// ============================================================
+// PAGE CLOSE
 // ============================================================
 
 window.addEventListener(
   "beforeunload",
   () => {
+
     stopRingtone();
 
     stopCallTimer();
 
     if (localStream) {
+
       localStream
         .getTracks()
-        .forEach(
-          track => {
-            try {
-              track.stop();
-            } catch (_) {}
-          }
-        );
+        .forEach(track => {
+
+          try {
+            track.stop();
+          } catch (error) {}
+        });
     }
 
     if (peerConnection) {
+
       try {
         peerConnection.close();
-      } catch (_) {}
+      } catch (error) {}
     }
   }
 );
 
 
 // ============================================================
-// NOTIFICATION SETUP BUTTON
+// NOTIFICATION SETUP
 // ============================================================
 
-// This lets the user grant notification permission
-// from a real button click, which browsers prefer.
+let notificationButton = null;
 
-const notificationButton =
-  document.createElement("button");
 
-notificationButton.textContent =
-  "🔔 Enable Call Notifications";
+function setupNotificationButton() {
 
-notificationButton.type =
-  "button";
+  if (!notificationButton) {
 
-notificationButton.id =
-  "enableNotificationsBtn";
-
-notificationButton.style.display =
-  "none";
-
-notificationButton.addEventListener(
-  "click",
-  async () => {
-    await requestNotificationPermission();
-
-    if (
-      "Notification" in window &&
-      Notification.permission === "granted"
-    ) {
-      notificationButton.style.display =
-        "none";
-
-      showNotification(
-        "Call notifications enabled."
+    notificationButton =
+      document.createElement(
+        "button"
       );
-    }
+
+    notificationButton.id =
+      "enableNotificationsBtn";
+
+    notificationButton.type =
+      "button";
+
+    notificationButton.textContent =
+      "🔔 Enable Call Notifications";
+
+    notificationButton.style.padding =
+      "12px 16px";
+
+    notificationButton.style.marginBottom =
+      "15px";
+
+    notificationButton.style.border =
+      "none";
+
+    notificationButton.style.borderRadius =
+      "10px";
+
+    notificationButton.style.background =
+      "#2563eb";
+
+    notificationButton.style.color =
+      "white";
+
+    notificationButton.style.fontWeight =
+      "bold";
+
+
+    notificationButton.addEventListener(
+      "click",
+      async () => {
+
+        await requestNotificationPermission();
+
+      }
+    );
   }
-);
 
-document.addEventListener(
-  "DOMContentLoaded",
-  () => {
-    const main =
-      $("mainSection");
 
-    if (
-      main &&
-      !document.getElementById(
-        "enableNotificationsBtn"
-      )
-    ) {
-      main.prepend(
+  const main =
+    $("mainSection");
+
+  if (
+    main &&
+    !document.getElementById(
+      "enableNotificationsBtn"
+    )
+  ) {
+
+    main
+      .querySelector(".main-content")
+      ?.prepend(
         notificationButton
       );
-    }
+  }
+
+
+  if (
+    "Notification" in window &&
+    Notification.permission !==
+    "granted"
+  ) {
+
+    notificationButton.style.display =
+      "block";
+
+  } else {
+
+    notificationButton.style.display =
+      "none";
+  }
+}
+
+
+// ============================================================
+// FCM / PUSH NOTIFICATIONS
+// ============================================================
+
+// Paste your existing VAPID public key here.
+// Do NOT put a private VAPID key in this file.
+
+const VAPID_PUBLIC_KEY =
+  "YOUR_EXISTING_VAPID_PUBLIC_KEY";
+
+
+async function requestNotificationPermission() {
+
+  if (!("Notification" in window)) {
+
+    showNotification(
+      "This browser does not support notifications."
+    );
+
+    return;
+  }
+
+
+  if (!messaging) {
+
+    showNotification(
+      "Firebase Messaging is not available."
+    );
+
+    return;
+  }
+
+
+  try {
+
+    const permission =
+      await Notification.requestPermission();
 
     if (
-      "Notification" in window &&
-      Notification.permission !== "granted"
+      permission !== "granted"
     ) {
-      notificationButton.style.display =
-        "block";
+
+      showNotification(
+        "Notification permission was not granted."
+      );
+
+      return;
     }
+
+
+    const registration =
+      await navigator.serviceWorker.register(
+        "/firebase-messaging-sw.js"
+      );
+
+
+    const token =
+      await getToken(
+        messaging,
+        {
+          vapidKey:
+            VAPID_PUBLIC_KEY,
+
+          serviceWorkerRegistration:
+            registration
+        }
+      );
+
+
+    if (!token) {
+
+      showNotification(
+        "Could not get notification token."
+      );
+
+      return;
+    }
+
+
+    console.log(
+      "FCM TOKEN:",
+      token
+    );
+
+
+    if (currentUser) {
+
+      await set(
+        ref(
+          db,
+          `users/${currentUser.uid}/fcmToken`
+        ),
+        token
+      );
+
+      await set(
+        ref(
+          db,
+          `users/${currentUser.uid}/fcmTokenUpdatedAt`
+        ),
+        Date.now()
+      );
+    }
+
+
+    if (notificationButton) {
+
+      notificationButton.style.display =
+        "none";
+    }
+
+
+    showNotification(
+      "Call notifications enabled!"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "NOTIFICATION PERMISSION ERROR:",
+      error
+    );
+
+    showNotification(
+      "Could not enable notifications."
+    );
   }
-);
+}
+
+
+// ============================================================
+// FOREGROUND FCM
+// ============================================================
+
+let foregroundMessagingStarted =
+  false;
+
+
+function setupForegroundMessaging() {
+
+  if (
+    foregroundMessagingStarted ||
+    !messaging
+  ) {
+    return;
+  }
+
+  foregroundMessagingStarted =
+    true;
+
+
+  onMessage(
+    messaging,
+    payload => {
+
+      console.log(
+        "FOREGROUND FCM MESSAGE:",
+        payload
+      );
+
+      const notification =
+        payload.notification ||
+        {};
+
+      showNotification(
+        notification.title ||
+        "Incoming call"
+      );
+
+      const data =
+        payload.data ||
+        {};
+
+      if (
+        data.type ===
+        "incoming_call"
+      ) {
+
+        // The RTDB listener also handles
+        // the actual incoming-call UI.
+        console.log(
+          "Incoming call notification received:",
+          data
+        );
+      }
+    }
+  );
+}
+
+
+// ============================================================
+// AUTO-REGISTER SERVICE WORKER
+// ============================================================
+
+if (
+  "serviceWorker" in navigator
+) {
+
+  navigator.serviceWorker
+    .register(
+      "/firebase-messaging-sw.js"
+    )
+    .then(
+      registration => {
+
+        console.log(
+          "Firebase messaging service worker registered:",
+          registration.scope
+        );
+
+      }
+    )
+    .catch(error => {
+
+      console.error(
+        "SERVICE WORKER REGISTRATION ERROR:",
+        error
+      );
+    });
+}
 
 
 // ============================================================
@@ -3376,5 +3328,17 @@ document.addEventListener(
 // ============================================================
 
 console.log(
-  "✅ VOICE CHAT APP LOADED"
+  "===================================="
+);
+
+console.log(
+  "✅ VOICE CHAT APP.JS LOADED"
+);
+
+console.log(
+  "Firebase:", app.name
+);
+
+console.log(
+  "===================================="
 );
