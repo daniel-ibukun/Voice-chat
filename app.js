@@ -2,9 +2,6 @@
 // VOICE CHAT APP - COMPLETE APP.JS
 // Firebase Auth + Realtime Database + WebRTC
 // ============================================================
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-
 import {
   getMessaging,
   getToken,
