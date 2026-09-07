@@ -34,7 +34,7 @@ import {
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "YOUR_EXISTING_API_KEY",
+  apiKey: "AIzaSyAVy5nFd6sjyoVSYnnqRfXJpu29FstxFZc",
   authDomain: "voice-chat01-63e85.firebaseapp.com",
   databaseURL:
     "https://voice-chat01-63e85-default-rtdb.europe-west1.firebasedatabase.app",
