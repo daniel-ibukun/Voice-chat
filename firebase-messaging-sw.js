@@ -1,6 +1,6 @@
-// ==========================================
-// FIREBASE MESSAGING SERVICE WORKER
-// ==========================================
+// ============================================================
+// FIREBASE CLOUD MESSAGING SERVICE WORKER
+// ============================================================
 
 importScripts(
   "https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"
@@ -11,9 +11,9 @@ importScripts(
 );
 
 
-// ==========================================
+// ============================================================
 // FIREBASE CONFIG
-// ==========================================
+// ============================================================
 
 firebase.initializeApp({
   apiKey: "AIzaSyAVy5nFd6sjyoVSYnnqRfXJpu29FstxFZc",
@@ -25,20 +25,21 @@ firebase.initializeApp({
 });
 
 
-// ==========================================
+// ============================================================
 // FIREBASE MESSAGING
-// ==========================================
+// ============================================================
 
 const messaging = firebase.messaging();
 
 
-// ==========================================
-// BACKGROUND INCOMING CALL
-// ==========================================
+// ============================================================
+// BACKGROUND CALL NOTIFICATION
+// ============================================================
 
 messaging.onBackgroundMessage((payload) => {
+
   console.log(
-    "[firebase-messaging-sw.js] Background message:",
+    "BACKGROUND FCM MESSAGE:",
     payload
   );
 
@@ -58,149 +59,86 @@ messaging.onBackgroundMessage((payload) => {
     data.body ||
     "Someone is calling you.";
 
-
-  // Prevent duplicate notification if necessary
-  const notificationOptions = {
-    body: body,
-
-    icon:
-      data.icon ||
-      "/icon-192.png",
-
-    badge:
-      data.badge ||
-      "/icon-192.png",
-
-    tag:
-      data.callId
-        ? `call-${data.callId}`
-        : "incoming-call",
-
-    renotify: true,
-
-    requireInteraction: true,
-
-    data: {
-      type:
-        data.type ||
-        "incoming_call",
-
-      callId:
-        data.callId || "",
-
-      callerId:
-        data.callerId || "",
-
-      callerName:
-        data.callerName ||
-        "User"
-    }
-  };
-
-
-  return self.registration.showNotification(
+  self.registration.showNotification(
     title,
-    notificationOptions
+    {
+      body: body,
+
+      icon:
+        data.icon ||
+        "/icon-192.png",
+
+      badge:
+        data.badge ||
+        "/icon-192.png",
+
+      tag:
+        data.callId
+          ? `call-${data.callId}`
+          : "incoming-call",
+
+      renotify: true,
+
+      requireInteraction: true,
+
+      data: data
+    }
   );
 });
 
 
-// ==========================================
-// NOTIFICATION CLICK
-// ==========================================
+// ============================================================
+// WHEN USER CLICKS THE NOTIFICATION
+// ============================================================
 
 self.addEventListener(
   "notificationclick",
   (event) => {
 
+    console.log(
+      "CALL NOTIFICATION CLICKED"
+    );
+
     event.notification.close();
 
-    const data =
-      event.notification.data || {};
-
-    const callId =
-      data.callId || "";
-
     event.waitUntil(
 
-      clients
-        .matchAll({
-          type: "window",
-          includeUncontrolled: true
-        })
+      clients.matchAll({
+        type: "window",
+        includeUncontrolled: true
+      })
 
-        .then((clientList) => {
+      .then((clientList) => {
 
-          // If the website is already open,
-          // bring it to the front.
-          for (const client of clientList) {
+        // If the website is already open,
+        // bring it to the front.
 
-            if ("focus" in client) {
+        for (
+          const client of clientList
+        ) {
 
-              if (
-                callId &&
-                "postMessage" in client
-              ) {
-                client.postMessage({
-                  type: "incoming_call",
-                  callId: callId
-                });
-              }
+          if (
+            "focus" in client
+          ) {
 
-              return client.focus();
-            }
+            return client.focus();
           }
+        }
 
+        // Otherwise open the website.
 
-          // If the website isn't open,
-          // open it.
-          if (clients.openWindow) {
+        if (
+          clients.openWindow
+        ) {
 
-            const url =
-              callId
-                ? `/?callId=${encodeURIComponent(callId)}`
-                : "/";
+          return clients.openWindow(
+            "/"
+          );
+        }
 
-            return clients.openWindow(url);
-          }
-
-        })
+      })
 
     );
-  }
-);
 
-
-// ==========================================
-// SERVICE WORKER INSTALL
-// ==========================================
-
-self.addEventListener(
-  "install",
-  () => {
-    console.log(
-      "Firebase Messaging Service Worker installed."
-    );
-
-    self.skipWaiting();
-  }
-);
-
-
-// ==========================================
-// SERVICE WORKER ACTIVATE
-// ==========================================
-
-self.addEventListener(
-  "activate",
-  (event) => {
-
-    event.waitUntil(
-      self.clients.claim()
-    );
-
-    console.log(
-      "Firebase Messaging Service Worker activated."
-    );
   }
 );
