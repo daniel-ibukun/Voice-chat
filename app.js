@@ -36,8 +36,7 @@ import {
 const firebaseConfig = {
   apiKey: "AIzaSyAVy5nFd6sjyoVSYnnqRfXJpu29FstxFZc",
   authDomain: "voice-chat01-63e85.firebaseapp.com",
-  databaseURL:
-    "https://voice-chat01-63e85-default-rtdb.europe-west1.firebasedatabase.app",
+  databaseURL: "https://voice-chat01-63e85-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "voice-chat01-63e85",
   storageBucket: "voice-chat01-63e85.firebasestorage.app",
   messagingSenderId: "113293901393",
