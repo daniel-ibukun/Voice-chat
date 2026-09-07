@@ -1,32 +1,32 @@
-/* =====================================================
+/* =========================================
    RESET
-===================================================== */
+========================================= */
 
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 html {
-  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
   min-height: 100vh;
   font-family: Arial, Helvetica, sans-serif;
-  background: #f4f7fb;
-  color: #1f2937;
+  background: #f3f6fb;
+  color: #172033;
 }
 
 
-/* =====================================================
+/* =========================================
    GENERAL
-===================================================== */
+========================================= */
 
 button,
 input {
-  font: inherit;
+  font-family: inherit;
 }
 
 button {
@@ -38,9 +38,9 @@ button {
 }
 
 
-/* =====================================================
+/* =========================================
    AUTHENTICATION
-===================================================== */
+========================================= */
 
 #authSection {
   min-height: 100vh;
@@ -50,685 +50,738 @@ button {
   padding: 20px;
   background: linear-gradient(
     135deg,
-    #4f46e5,
-    #6366f1,
-    #818cf8
+    #e8f0ff,
+    #f8fbff
   );
 }
 
-.auth-card {
+.auth-container {
   width: 100%;
   max-width: 430px;
-  background: white;
+}
+
+.auth-box {
+  width: 100%;
+  background: #ffffff;
   padding: 35px;
-  border-radius: 20px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+  border-radius: 22px;
+  box-shadow:
+    0 15px 50px rgba(0, 0, 0, 0.12);
 }
 
-.auth-card h1 {
-  text-align: center;
+.logo {
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 15px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #2563eb;
+  color: white;
+
   font-size: 32px;
-  margin-bottom: 8px;
-  color: #4f46e5;
 }
 
-.auth-card .subtitle {
+.auth-box h1 {
   text-align: center;
-  color: #6b7280;
-  margin-bottom: 30px;
+  font-size: 28px;
+  margin-bottom: 8px;
 }
 
-.auth-card h2 {
-  margin-bottom: 20px;
-  font-size: 24px;
+.subtitle {
+  text-align: center;
+  color: #70798a;
+  margin-bottom: 25px;
 }
 
-.auth-card input {
+.auth-box label {
   display: block;
+  margin-top: 15px;
+  margin-bottom: 7px;
+
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.auth-box input {
   width: 100%;
-  height: 50px;
-  margin-bottom: 15px;
-  padding: 0 15px;
-  border: 1px solid #d1d5db;
+  padding: 14px;
+
+  border: 1px solid #d5dbe5;
   border-radius: 10px;
+
+  background: #fafbfd;
+  color: #172033;
+
+  font-size: 15px;
   outline: none;
-  background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.auth-card input:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+.auth-box input:focus {
+  border-color: #2563eb;
+  background: white;
 }
 
-.auth-card > div > button {
+.primary-btn {
   width: 100%;
-  min-height: 50px;
+
+  margin-top: 20px;
+  padding: 14px;
+
   border: none;
   border-radius: 10px;
-  background: #4f46e5;
+
+  background: #2563eb;
   color: white;
+
+  font-size: 16px;
   font-weight: bold;
-  transition: background 0.2s, transform 0.2s;
 }
 
-.auth-card > div > button:hover {
-  background: #4338ca;
+.primary-btn:hover {
+  background: #1d4ed8;
 }
 
-.auth-card > div > button:active {
-  transform: scale(0.98);
-}
-
-.auth-card > div > button:disabled {
+.primary-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.auth-card p {
-  margin-top: 18px;
-  text-align: center;
-  color: #6b7280;
-}
+.link-btn {
+  display: block;
 
-.auth-card p button {
+  margin: 20px auto 0;
+
   border: none;
   background: transparent;
-  color: #4f46e5;
-  font-weight: bold;
-  cursor: pointer;
+
+  color: #2563eb;
+
+  font-size: 14px;
 }
 
-.auth-card p button:hover {
+.link-btn:hover {
   text-decoration: underline;
 }
 
-#authMessage,
-#registerMessage {
+.message {
   min-height: 20px;
+
   margin-top: 12px;
+
+  text-align: center;
+
+  color: #dc2626;
+
   font-size: 14px;
 }
 
 
-/* =====================================================
-   MAIN APP
-===================================================== */
+/* =========================================
+   MAIN APPLICATION
+========================================= */
 
 #mainSection {
   min-height: 100vh;
-  background: #f4f7fb;
 }
 
-
-/* =====================================================
-   HEADER
-===================================================== */
-
-.header {
+.top-header {
   width: 100%;
-  min-height: 75px;
-  padding: 15px 30px;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
+
+  padding: 15px 25px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   gap: 20px;
+
+  background: white;
+
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.08);
+
+  position: sticky;
+  top: 0;
+
+  z-index: 100;
 }
 
-.header h1 {
-  color: #4f46e5;
-  font-size: 26px;
-}
-
-.header p {
-  margin-top: 3px;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.header-user {
+.profile-area {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.avatar {
-  width: 45px;
-  height: 45px;
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+
   border-radius: 50%;
+
   object-fit: cover;
-  background: #e5e7eb;
+
+  border: 3px solid #e6edff;
 }
 
-#logoutBtn {
-  border: none;
-  border-radius: 9px;
-  padding: 10px 16px;
-  background: #ef4444;
-  color: white;
+#welcomeText {
+  font-size: 17px;
   font-weight: bold;
 }
 
-#logoutBtn:hover {
+.online-status {
+  margin-top: 3px;
+
+  color: #16a34a;
+
+  font-size: 13px;
+}
+
+.logout-btn {
+  padding: 11px 18px;
+
+  border: none;
+  border-radius: 9px;
+
+  background: #ef4444;
+  color: white;
+
+  font-weight: bold;
+}
+
+.logout-btn:hover {
   background: #dc2626;
 }
 
 
-/* =====================================================
+/* =========================================
    MAIN CONTENT
-===================================================== */
+========================================= */
 
-main {
+.main-content {
   width: 100%;
   max-width: 1000px;
+
   margin: 0 auto;
-  padding: 30px 20px 50px;
+
+  padding: 25px;
 }
 
-.section-title {
-  margin: 25px 0 15px;
-  font-size: 22px;
-  color: #111827;
-}
+.app-card {
+  margin-bottom: 22px;
 
+  padding: 22px;
 
-/* =====================================================
-   USERS
-===================================================== */
-
-.users-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.user-card {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 15px;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
-  transition: transform 0.2s, box-shadow 0.2s;
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 5px 25px rgba(0, 0, 0, 0.07);
 }
 
-.user-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+.card-header {
+  margin-bottom: 18px;
 }
 
-.user-avatar {
-  width: 55px;
-  height: 55px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #e5e7eb;
+.card-header h2 {
+  margin-bottom: 5px;
+
+  font-size: 21px;
+}
+
+.card-header p {
+  color: #7a8494;
+
+  font-size: 14px;
+}
+
+
+/* =========================================
+   USERS
+========================================= */
+
+#usersList {
+  min-height: 50px;
+}
+
+.user-item {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 15px;
+
+  padding: 14px 5px;
+
+  border-bottom: 1px solid #edf0f4;
+}
+
+.user-item:last-child {
+  border-bottom: none;
 }
 
 .user-info {
-  flex: 1;
   min-width: 0;
+
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 15px;
+
+  gap: 12px;
 }
 
-.user-details {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.user-info img {
+  width: 48px;
+  height: 48px;
 
-.user-details strong {
-  color: #111827;
-  font-size: 17px;
-}
-
-.user-details small {
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #9ca3af;
-}
-
-.status-dot.online {
-  background: #22c55e;
-}
-
-.call-user-btn {
   flex-shrink: 0;
-  border: none;
-  border-radius: 9px;
-  padding: 11px 17px;
-  background: #4f46e5;
-  color: white;
+
+  border-radius: 50%;
+
+  object-fit: cover;
+}
+
+.user-name {
   font-weight: bold;
 }
 
-.call-user-btn:hover {
-  background: #4338ca;
+.user-email {
+  margin-top: 3px;
+
+  color: #7a8494;
+
+  font-size: 13px;
+}
+
+.call-btn {
+  padding: 10px 15px;
+
+  border: none;
+  border-radius: 9px;
+
+  background: #16a34a;
+  color: white;
+
+  font-weight: bold;
+}
+
+.call-btn:hover {
+  background: #15803d;
 }
 
 
-/* =====================================================
+/* =========================================
+   CALL HISTORY
+========================================= */
+
+#callHistoryList {
+  min-height: 50px;
+}
+
+.history-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 13px;
+
+  padding: 14px 5px;
+
+  border-bottom: 1px solid #edf0f4;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-item img {
+  width: 48px;
+  height: 48px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+
+  object-fit: cover;
+}
+
+.history-info {
+  flex: 1;
+
+  min-width: 0;
+}
+
+.history-name {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.history-email {
+  margin-top: 2px;
+
+  color: #7a8494;
+
+  font-size: 13px;
+}
+
+.history-status {
+  margin-top: 5px;
+
+  font-size: 14px;
+}
+
+.history-duration {
+  margin-top: 3px;
+
+  color: #596273;
+
+  font-size: 13px;
+}
+
+.history-date {
+  margin-top: 3px;
+
+  color: #8a93a1;
+
+  font-size: 12px;
+}
+
+
+/* =========================================
    CALL OVERLAYS
-===================================================== */
+========================================= */
 
 .call-overlay {
   position: fixed;
+
   inset: 0;
+
   z-index: 1000;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 
   padding: 20px;
 
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(5px);
+  background: rgba(
+    10,
+    18,
+    35,
+    0.75
+  );
 }
 
-
-/* =====================================================
-   CALL CARD
-===================================================== */
-
-.call-card {
+.call-window {
   width: 100%;
-  max-width: 400px;
+  max-width: 410px;
+
   padding: 35px 25px;
+
   text-align: center;
 
   background: white;
-  border-radius: 22px;
+
+  border-radius: 25px;
 
   box-shadow:
-    0 25px 70px rgba(0, 0, 0, 0.3);
-
-  animation: callCardIn 0.25s ease;
+    0 20px 60px rgba(
+      0,
+      0,
+      0,
+      0.3
+    );
 }
 
-@keyframes callCardIn {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
+.call-icon {
+  margin-bottom: 10px;
 
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  font-size: 28px;
 }
 
+.call-label {
+  margin-bottom: 20px;
 
-/* =====================================================
-   LARGE AVATAR
-===================================================== */
+  color: #64748b;
 
-.large-avatar {
-  display: block;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 20px;
+  font-size: 13px;
+  font-weight: bold;
+
+  letter-spacing: 1px;
+}
+
+.call-avatar {
+  width: 105px;
+  height: 105px;
+
+  margin-bottom: 15px;
 
   border-radius: 50%;
+
   object-fit: cover;
 
-  background: #e5e7eb;
-
-  border: 5px solid #eef2ff;
+  border: 5px solid #edf2ff;
 }
 
+.call-window h2 {
+  margin-bottom: 8px;
 
-/* =====================================================
-   CALL TEXT
-===================================================== */
-
-.call-card h2 {
-  margin-bottom: 7px;
-  color: #111827;
-  font-size: 25px;
+  font-size: 24px;
 }
 
-.call-card p {
+.call-window p {
+  margin-bottom: 15px;
+
   color: #6b7280;
 }
 
-.call-status {
-  margin-top: 8px;
-}
+.call-actions,
+.call-controls {
+  display: flex;
 
-#callType {
-  margin-bottom: 5px;
-  color: #4f46e5;
-  font-weight: bold;
-}
+  justify-content: center;
 
-#callStatus {
-  margin-bottom: 10px;
-}
+  gap: 10px;
 
-.call-timer {
-  margin: 15px 0 25px;
-  color: #111827;
-  font-size: 32px;
-  font-weight: bold;
-  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+
+  margin-top: 25px;
 }
 
 
-/* =====================================================
-   RINGING
-===================================================== */
+/* =========================================
+   INCOMING CALL
+========================================= */
 
-.ringing-indicator {
-  margin: 20px 0;
-  color: #4f46e5;
-  font-weight: bold;
-  animation: ringingPulse 1s infinite;
+#incomingCallOverlay .call-window {
+  animation: incomingPulse 1.5s infinite;
 }
 
-@keyframes ringingPulse {
+@keyframes incomingPulse {
+
   0% {
-    opacity: 1;
+    transform: scale(1);
   }
 
   50% {
-    opacity: 0.4;
+    transform: scale(1.025);
   }
 
   100% {
-    opacity: 1;
+    transform: scale(1);
   }
+
 }
 
-
-/* =====================================================
-   CALL BUTTONS
-===================================================== */
-
-.call-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.call-control {
-  min-width: 95px;
-  min-height: 45px;
-  padding: 10px 15px;
+.accept-btn {
+  padding: 13px 22px;
 
   border: none;
   border-radius: 10px;
 
-  background: #eef2ff;
-  color: #3730a3;
+  background: #16a34a;
+  color: white;
 
   font-weight: bold;
-}
-
-.call-control:hover {
-  background: #e0e7ff;
-}
-
-.call-control.end-call {
-  background: #ef4444;
-  color: white;
-}
-
-.call-control.end-call:hover {
-  background: #dc2626;
-}
-
-
-/* =====================================================
-   INCOMING CALL BUTTONS
-===================================================== */
-
-.incoming-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 25px;
-}
-
-.accept-btn {
-  min-width: 120px;
-  background: #22c55e;
-  color: white;
+  font-size: 15px;
 }
 
 .accept-btn:hover {
-  background: #16a34a;
+  background: #15803d;
 }
 
 .reject-btn {
-  min-width: 120px;
+  padding: 13px 22px;
+
+  border: none;
+  border-radius: 10px;
+
   background: #ef4444;
   color: white;
+
+  font-weight: bold;
+  font-size: 15px;
 }
 
 .reject-btn:hover {
   background: #dc2626;
 }
 
+.ringing-text {
+  margin-bottom: 15px;
 
-/* =====================================================
+  color: #2563eb !important;
+
+  font-weight: bold;
+}
+
+
+/* =========================================
+   ACTIVE CALL
+========================================= */
+
+.active-call {
+  background: #111827;
+  color: white;
+}
+
+.active-call .call-label {
+  color: #9ca3af;
+}
+
+.active-call p {
+  color: #d1d5db;
+}
+
+.active-call .call-avatar {
+  border-color: #374151;
+}
+
+#callTimer {
+  margin-top: 12px;
+
+  font-size: 25px;
+
+  font-weight: bold;
+}
+
+.control-btn {
+  padding: 12px 17px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #374151;
+  color: white;
+
+  font-weight: bold;
+}
+
+.control-btn:hover {
+  background: #4b5563;
+}
+
+.end-btn {
+  padding: 12px 18px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #ef4444;
+  color: white;
+
+  font-weight: bold;
+}
+
+.end-btn:hover {
+  background: #dc2626;
+}
+
+
+/* =========================================
    NOTIFICATION
-===================================================== */
+========================================= */
 
-.notification {
+#notification {
   position: fixed;
+
   right: 20px;
   bottom: 20px;
-  z-index: 2000;
+
+  z-index: 3000;
 
   max-width: 350px;
-  padding: 15px 20px;
+
+  padding: 14px 18px;
+
+  border-radius: 10px;
 
   background: #111827;
   color: white;
 
-  border-radius: 10px;
+  box-shadow:
+    0 8px 25px rgba(
+      0,
+      0,
+      0,
+      0.2
+    );
 
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-
-  animation: notificationIn 0.25s ease;
-}
-
-@keyframes notificationIn {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  display: none;
 }
 
 
-/* =====================================================
-   LOADING
-===================================================== */
-
-.loading {
-  padding: 25px;
-  text-align: center;
-  color: #6b7280;
-}
-
-
-/* =====================================================
-   CALL HISTORY
-===================================================== */
-
-#callHistory {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-#callHistory .user-card {
-  box-shadow: none;
-}
-
-#callHistory .user-details span {
-  text-transform: capitalize;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-
-/* =====================================================
+/* =========================================
    AUDIO
-===================================================== */
+========================================= */
 
 #remoteAudio {
   display: none;
 }
 
 
-/* =====================================================
+/* =========================================
    MOBILE
-===================================================== */
+========================================= */
 
-@media (max-width: 600px) {
+@media (max-width: 650px) {
 
-  .auth-card {
-    padding: 25px 20px;
+  #authSection {
+    padding: 15px;
   }
 
-  .header {
-    padding: 12px 15px;
+  .auth-box {
+    padding: 27px 20px;
   }
 
-  .header h1 {
-    font-size: 21px;
+  .top-header {
+    padding: 13px 15px;
   }
 
-  .header-user {
-    gap: 7px;
+  .main-content {
+    padding: 15px;
   }
 
-  .avatar {
-    width: 40px;
-    height: 40px;
+  .app-card {
+    padding: 17px;
   }
 
-  #logoutBtn {
-    padding: 8px 11px;
-    font-size: 13px;
+  .user-item {
+    align-items: flex-start;
   }
 
-  main {
-    padding: 20px 12px 40px;
-  }
-
-  .user-card {
-    padding: 12px;
-  }
-
-  .user-avatar {
-    width: 48px;
-    height: 48px;
-  }
-
-  .user-info {
-    gap: 8px;
-  }
-
-  .user-details strong {
-    font-size: 15px;
-  }
-
-  .user-details small {
-    max-width: 150px;
-  }
-
-  .call-user-btn {
+  .call-btn {
     padding: 9px 11px;
     font-size: 13px;
   }
 
-  .call-card {
+  .call-window {
     padding: 30px 20px;
   }
 
-  .large-avatar {
-    width: 100px;
-    height: 100px;
+  .call-avatar {
+    width: 90px;
+    height: 90px;
   }
 
-  .call-controls {
-    gap: 8px;
-  }
-
-  .call-control {
-    min-width: 85px;
-    padding: 9px 10px;
-    font-size: 13px;
-  }
-
-  .incoming-buttons {
-    gap: 10px;
-  }
-
-  .notification {
-    left: 15px;
-    right: 15px;
-    bottom: 15px;
-    max-width: none;
-  }
-}
-
-
-/* =====================================================
-   SMALL PHONES
-===================================================== */
-
-@media (max-width: 380px) {
-
-  .user-info {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .call-user-btn {
+  .call-actions button,
+  .call-controls button {
     width: 100%;
   }
 
-  .header {
-    align-items: flex-start;
+  .profile-avatar {
+    width: 45px;
+    height: 45px;
   }
 
-  .header-user {
-    flex-direction: column;
+  #welcomeText {
+    font-size: 15px;
   }
 
 }
