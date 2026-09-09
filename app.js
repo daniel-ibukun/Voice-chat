@@ -1,9 +1,16 @@
 // ============================================================
-// VOICECHAT - CLEAN APP.JS
-// Firebase + WebRTC Voice Calling
+// VOICECHAT
+// Complete Firebase + WebRTC Voice Calling Application
 // ============================================================
 
-import { initializeApp } from
+
+// ============================================================
+// 1. FIREBASE IMPORTS
+// ============================================================
+
+import {
+  initializeApp
+} from
   "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 
 import {
@@ -29,118 +36,474 @@ import {
 
 
 // ============================================================
-// 1. FIREBASE CONFIG
+// 2. FIREBASE CONFIG
 // ============================================================
-// IMPORTANT:
-// Replace ONLY the values below with your Firebase project data.
+//
+// REPLACE ONLY THESE VALUES WITH YOUR FIREBASE VALUES.
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAVy5nFd6sjyoVSYnnqRfXJpu29FstxFZc",
-  authDomain: "voice-chat01-63e85.firebaseapp.com",
-  databaseURL: "https://voice-chat01-63e85-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "voice-chat01-63e85",
-  storageBucket: "voice-chat01-63e85.firebasestorage.app",
-  messagingSenderId: "113293901393",
-  appId: "1:113293901393:web:bfbca6f5da36368e274270"
+
+  apiKey:
+    "YOUR_API_KEY",
+
+  authDomain:
+    "YOUR_PROJECT.firebaseapp.com",
+
+  databaseURL:
+    "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+
+  projectId:
+    "YOUR_PROJECT_ID",
+
+  storageBucket:
+    "YOUR_PROJECT.firebasestorage.app",
+
+  messagingSenderId:
+    "YOUR_MESSAGING_SENDER_ID",
+
+  appId:
+    "YOUR_APP_ID"
+
 };
 
 
 // ============================================================
-// 2. FIREBASE INITIALIZATION
+// 3. FIREBASE INITIALIZATION
 // ============================================================
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+const firebaseApp =
+  initializeApp(firebaseConfig);
+
+const auth =
+  getAuth(firebaseApp);
+
+const db =
+  getDatabase(firebaseApp);
 
 
 // ============================================================
-// 3. HELPER FUNCTIONS
+// 4. HELPER
 // ============================================================
 
-const $ = (id) => document.getElementById(id);
+const $ = id =>
+  document.getElementById(id);
 
 
 function show(element) {
+
   if (element) {
     element.classList.remove("hidden");
   }
+
 }
 
 
 function hide(element) {
+
   if (element) {
     element.classList.add("hidden");
   }
+
 }
 
 
 function getInitials(name = "User") {
-  const parts = String(name)
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2);
+
+  const parts =
+    String(name)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2);
 
   return (
     parts
-      .map(part => part.charAt(0).toUpperCase())
-      .join("") || "U"
+      .map(part =>
+        part.charAt(0).toUpperCase()
+      )
+      .join("")
+    || "U"
   );
+
 }
 
 
 function escapeText(value = "") {
+
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+
 }
 
 
 function formatDuration(seconds) {
-  seconds = Math.max(0, Number(seconds) || 0);
 
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
+  const total =
+    Math.max(
+      0,
+      Number(seconds) || 0
+    );
+
+  const minutes =
+    Math.floor(total / 60);
+
+  const remaining =
+    total % 60;
 
   return (
     String(minutes).padStart(2, "0") +
     ":" +
     String(remaining).padStart(2, "0")
   );
+
 }
 
 
-function getCurrentUserName() {
-  if (!currentUser) {
-    return "User";
+function now() {
+
+  return Date.now();
+
+}
+
+
+// ============================================================
+// 5. STATE
+// ============================================================
+
+let currentUser = null;
+
+let currentCallId = null;
+
+let currentCallRole = null;
+
+let currentRemoteUser = null;
+
+let pendingIncomingCall = null;
+
+let peerConnection = null;
+
+let localStream = null;
+
+let callStartTime = null;
+
+let callTimerInterval = null;
+
+let isMuted = false;
+
+let isSpeakerOn = true;
+
+let usersUnsubscribe = null;
+
+let historyUnsubscribe = null;
+
+let currentCallUnsubscribe = null;
+
+let currentCandidateUnsubscribe = null;
+
+let incomingCallsUnsubscribe = null;
+
+let callsListenerStarted = false;
+
+let callFinishing = false;
+
+
+// ============================================================
+// 6. WEBRTC
+// ============================================================
+
+const rtcConfig = {
+
+  iceServers: [
+
+    {
+      urls:
+        "stun:stun.l.google.com:19302"
+    },
+
+    {
+      urls:
+        "stun:stun1.l.google.com:19302"
+    }
+
+  ]
+
+};
+
+
+// ============================================================
+// 7. RINGTONE
+// ============================================================
+
+const ringtone =
+  $("ringtone");
+
+
+function startRingtone() {
+
+  if (!ringtone) {
+    return;
   }
 
-  return (
-    currentUser.displayName ||
-    currentUser.email?.split("@")[0] ||
-    "User"
-  );
+  ringtone.currentTime = 0;
+
+  ringtone.loop = true;
+
+  ringtone.play()
+    .catch(error => {
+
+      console.warn(
+        "Ringtone autoplay blocked:",
+        error
+      );
+
+    });
+
 }
 
 
-function showAuthMessage(message) {
-  const element = $("authMessage");
+function stopRingtone() {
 
-  if (element) {
-    element.textContent = message;
+  if (!ringtone) {
+    return;
   }
+
+  ringtone.pause();
+
+  ringtone.currentTime = 0;
+
 }
 
+
+// ============================================================
+// 8. AUTH BUTTONS
+// ============================================================
+
+$("loginBtn")?.addEventListener(
+  "click",
+  login
+);
+
+$("registerBtn")?.addEventListener(
+  "click",
+  register
+);
+
+$("logoutBtn")?.addEventListener(
+  "click",
+  logout
+);
+
+$("notificationBtn")?.addEventListener(
+  "click",
+  requestNotifications
+);
+
+
+// ============================================================
+// 9. REGISTER
+// ============================================================
+
+async function register() {
+
+  const email =
+    $("emailInput")?.value.trim();
+
+  const password =
+    $("passwordInput")?.value;
+
+  if (!email || !password) {
+
+    showAuthMessage(
+      "Enter your email and password."
+    );
+
+    return;
+  }
+
+  if (password.length < 6) {
+
+    showAuthMessage(
+      "Password must contain at least 6 characters."
+    );
+
+    return;
+  }
+
+  try {
+
+    const result =
+      await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+    const name =
+      email.split("@")[0];
+
+    await set(
+      ref(
+        db,
+        `users/${result.user.uid}`
+      ),
+      {
+
+        uid:
+          result.user.uid,
+
+        email:
+          email,
+
+        name:
+          name,
+
+        online:
+          true,
+
+        createdAt:
+          now(),
+
+        lastSeen:
+          now()
+
+      }
+    );
+
+    showAuthMessage(
+      "Account created successfully."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "REGISTER ERROR:",
+      error
+    );
+
+    showAuthMessage(
+      friendlyAuthError(error)
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// 10. LOGIN
+// ============================================================
+
+async function login() {
+
+  const email =
+    $("emailInput")?.value.trim();
+
+  const password =
+    $("passwordInput")?.value;
+
+  if (!email || !password) {
+
+    showAuthMessage(
+      "Enter your email and password."
+    );
+
+    return;
+  }
+
+  try {
+
+    await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    showAuthMessage("");
+
+  } catch (error) {
+
+    console.error(
+      "LOGIN ERROR:",
+      error
+    );
+
+    showAuthMessage(
+      friendlyAuthError(error)
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// 11. LOGOUT
+// ============================================================
+
+async function logout() {
+
+  try {
+
+    if (currentCallId) {
+
+      await endCall();
+
+    }
+
+    if (currentUser) {
+
+      await update(
+        ref(
+          db,
+          `users/${currentUser.uid}`
+        ),
+        {
+
+          online:
+            false,
+
+          lastSeen:
+            now()
+
+        }
+      );
+
+    }
+
+    await signOut(auth);
+
+  } catch (error) {
+
+    console.error(
+      "LOGOUT ERROR:",
+      error
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// 12. AUTH ERRORS
+// ============================================================
 
 function friendlyAuthError(error) {
-  const code = error?.code || "";
+
+  const code =
+    error?.code || "";
 
   switch (code) {
+
     case "auth/invalid-credential":
+      return "Incorrect email or password.";
+
+    case "auth/invalid-login-credentials":
       return "Incorrect email or password.";
 
     case "auth/email-already-in-use":
@@ -156,220 +519,112 @@ function friendlyAuthError(error) {
       return "Network error. Check your internet.";
 
     default:
-      return error?.message || "Authentication failed.";
-  }
-}
-
-
-// ============================================================
-// 4. APPLICATION STATE
-// ============================================================
-
-let currentUser = null;
-
-let usersUnsubscribe = null;
-let historyUnsubscribe = null;
-
-let callsListenerStarted = false;
-let incomingCallsUnsubscribe = null;
-
-let callUnsubscribers = [];
-
-let currentCallId = null;
-let currentCallRole = null;
-
-let currentRemoteUser = null;
-
-let peerConnection = null;
-let localStream = null;
-
-let pendingIncomingCall = null;
-
-let callStartTime = null;
-let callTimerInterval = null;
-
-let isMuted = false;
-let isSpeakerOn = true;
-
-
-// ============================================================
-// 5. WEBRTC CONFIGURATION
-// ============================================================
-
-const rtcConfig = {
-  iceServers: [
-    {
-      urls: "stun:stun.l.google.com:19302"
-    },
-    {
-      urls: "stun:stun1.l.google.com:19302"
-    }
-  ]
-};
-
-
-// ============================================================
-// 6. AUTH BUTTONS
-// ============================================================
-
-$("loginBtn")?.addEventListener("click", login);
-$("registerBtn")?.addEventListener("click", register);
-$("logoutBtn")?.addEventListener("click", logout);
-
-
-// ============================================================
-// 7. REGISTER
-// ============================================================
-
-async function register() {
-  const email = $("emailInput")?.value.trim();
-  const password = $("passwordInput")?.value;
-
-  if (!email || !password) {
-    showAuthMessage("Enter an email and password.");
-    return;
-  }
-
-  if (password.length < 6) {
-    showAuthMessage(
-      "Password must contain at least 6 characters."
-    );
-    return;
-  }
-
-  try {
-    const result =
-      await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
+      return (
+        error?.message ||
+        "Authentication failed."
       );
 
-    await set(
-      ref(db, `users/${result.user.uid}`),
-      {
-        uid: result.user.uid,
-        email: email,
-        name: email.split("@")[0],
-        createdAt: Date.now(),
-        online: true,
-        lastSeen: Date.now()
-      }
-    );
-
-    showAuthMessage("Account created.");
-  } catch (error) {
-    console.error("REGISTER ERROR:", error);
-    showAuthMessage(friendlyAuthError(error));
   }
+
+}
+
+
+function showAuthMessage(message) {
+
+  const element =
+    $("authMessage");
+
+  if (element) {
+
+    element.textContent =
+      message;
+
+  }
+
 }
 
 
 // ============================================================
-// 8. LOGIN
+// 13. AUTH STATE
 // ============================================================
 
-async function login() {
-  const email = $("emailInput")?.value.trim();
-  const password = $("passwordInput")?.value;
+onAuthStateChanged(
+  auth,
+  async user => {
 
-  if (!email || !password) {
-    showAuthMessage("Enter your email and password.");
-    return;
-  }
+    if (user) {
 
-  try {
-    await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+      currentUser =
+        user;
 
-    showAuthMessage("");
-  } catch (error) {
-    console.error("LOGIN ERROR:", error);
-    showAuthMessage(friendlyAuthError(error));
-  }
-}
-
-
-// ============================================================
-// 9. LOGOUT
-// ============================================================
-
-async function logout() {
-  try {
-    await cleanupCall(false);
-
-    if (currentUser) {
-      await update(
-        ref(db, `users/${currentUser.uid}`),
-        {
-          online: false,
-          lastSeen: Date.now()
-        }
+      show(
+        $("appScreen")
       );
-    }
 
-    await signOut(auth);
-  } catch (error) {
-    console.error("LOGOUT ERROR:", error);
-  }
-}
+      hide(
+        $("authScreen")
+      );
 
-
-// ============================================================
-// 10. AUTH STATE
-// ============================================================
-
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUser = user;
-
-    show($("appScreen"));
-    hide($("authScreen"));
-
-    if ($("currentUserText")) {
       $("currentUserText").textContent =
-        user.email || "";
-    }
+        user.email || "User";
 
-    try {
-      await ensureUserProfile();
-    } catch (error) {
-      console.error(
-        "PROFILE ERROR:",
-        error
+      try {
+
+        await ensureUserProfile();
+
+        startUsersListener();
+
+        startHistoryListener();
+
+        startIncomingCallListener();
+
+      } catch (error) {
+
+        console.error(
+          "STARTUP ERROR:",
+          error
+        );
+
+      }
+
+    } else {
+
+      currentUser =
+        null;
+
+      hide(
+        $("appScreen")
       );
+
+      show(
+        $("authScreen")
+      );
+
+      stopAllListeners();
+
+      hideAllCallOverlays();
+
     }
 
-    startUsersListener();
-    startHistoryListener();
-    startIncomingCallListener();
-
-  } else {
-    currentUser = null;
-
-    hide($("appScreen"));
-    show($("authScreen"));
-
-    stopListeners();
-    hideAllCallOverlays();
   }
-});
+);
 
 
 // ============================================================
-// 11. USER PROFILE
+// 14. USER PROFILE
 // ============================================================
 
 async function ensureUserProfile() {
+
   if (!currentUser) {
     return;
   }
 
   const userRef =
-    ref(db, `users/${currentUser.uid}`);
+    ref(
+      db,
+      `users/${currentUser.uid}`
+    );
 
   const snapshot =
     await get(userRef);
@@ -382,7 +637,9 @@ async function ensureUserProfile() {
   await update(
     userRef,
     {
-      uid: currentUser.uid,
+
+      uid:
+        currentUser.uid,
 
       email:
         currentUser.email || "",
@@ -392,73 +649,99 @@ async function ensureUserProfile() {
         currentUser.email?.split("@")[0] ||
         "User",
 
-      online: true,
+      online:
+        true,
 
-      lastSeen: Date.now()
+      lastSeen:
+        now()
+
     }
   );
+
 }
 
 
 // ============================================================
-// 12. USERS LISTENER
+// 15. USERS LISTENER
 // ============================================================
 
 function startUsersListener() {
+
   if (usersUnsubscribe) {
+
     usersUnsubscribe();
-    usersUnsubscribe = null;
+
+    usersUnsubscribe =
+      null;
+
   }
 
   if (!currentUser) {
     return;
   }
 
-  const usersRef = ref(db, "users");
+  const usersRef =
+    ref(
+      db,
+      "users"
+    );
 
   usersUnsubscribe =
     onValue(
       usersRef,
       snapshot => {
+
         renderUsers(
           snapshot.val() || {}
         );
+
       },
       error => {
+
         console.error(
-          "USERS LISTENER ERROR:",
+          "USERS ERROR:",
           error
         );
 
         if ($("usersList")) {
+
           $("usersList").innerHTML =
-            `<p class="empty">
+            `
+            <p class="empty">
               Unable to load users.
-            </p>`;
+            </p>
+            `;
+
         }
+
       }
     );
+
 }
 
 
 // ============================================================
-// 13. RENDER USERS
+// 16. RENDER USERS
 // ============================================================
 
 function renderUsers(users) {
-  const container = $("usersList");
 
-  if (!container || !currentUser) {
+  const container =
+    $("usersList");
+
+  if (!container) {
     return;
   }
 
   const list =
     Object.values(users)
+
       .filter(user =>
         user &&
         user.uid &&
-        user.uid !== currentUser.uid
+        user.uid !== currentUser?.uid
       )
+
       .sort(
         (a, b) =>
           String(a.name || "")
@@ -468,68 +751,85 @@ function renderUsers(users) {
       );
 
   if (!list.length) {
+
     container.innerHTML =
-      `<p class="empty">
+      `
+      <p class="empty">
         No other users yet.
-      </p>`;
+      </p>
+      `;
 
     return;
   }
 
   container.innerHTML =
-    list.map(user => {
-      const name =
-        user.name ||
-        user.email ||
-        "User";
+    list
+      .map(user => {
 
-      return `
-        <div class="user-card">
+        const name =
+          user.name ||
+          user.email ||
+          "User";
 
-          <div class="avatar">
-            ${escapeText(
-              getInitials(name)
-            )}
-          </div>
+        const onlineText =
+          user.online
+            ? "🟢 Online"
+            : "⚫ Offline";
 
-          <div class="user-info">
+        return `
 
-            <div class="user-name">
-              ${escapeText(name)}
-            </div>
+          <div class="user-card">
 
-            <div class="user-email">
+            <div class="avatar">
               ${escapeText(
-                user.email || ""
+                getInitials(name)
               )}
             </div>
 
-            <div class="user-status">
-              ${user.online ? "🟢 Online" : "⚪ Offline"}
+            <div class="user-info">
+
+              <div class="user-name">
+                ${escapeText(name)}
+              </div>
+
+              <div class="user-email">
+                ${escapeText(
+                  user.email || ""
+                )}
+              </div>
+
+              <div class="user-email">
+                ${onlineText}
+              </div>
+
             </div>
+
+            <button
+              class="call-user-btn"
+              data-call-user="${escapeText(
+                user.uid
+              )}"
+            >
+              📞 Call
+            </button>
 
           </div>
 
-          <button
-            class="call-user-btn"
-            data-call-user="${escapeText(
-              user.uid
-            )}"
-          >
-            📞 Call
-          </button>
+        `;
 
-        </div>
-      `;
-    })
-    .join("");
+      })
+      .join("");
 
   container
-    .querySelectorAll("[data-call-user]")
+    .querySelectorAll(
+      "[data-call-user]"
+    )
     .forEach(button => {
+
       button.addEventListener(
         "click",
         () => {
+
           const uid =
             button.dataset.callUser;
 
@@ -540,41 +840,73 @@ function renderUsers(users) {
             );
 
           if (user) {
-            startOutgoingCall(user);
+
+            startOutgoingCall(
+              user
+            );
+
           }
+
         }
       );
+
     });
+
 }
 
 
 // ============================================================
-// 14. START OUTGOING CALL
+// 17. START OUTGOING CALL
 // ============================================================
 
 async function startOutgoingCall(remoteUser) {
-  if (!currentUser || !remoteUser) {
+
+  if (!currentUser) {
     return;
   }
 
   if (currentCallId) {
+
     alert(
       "You are already in a call."
     );
+
+    return;
+  }
+
+  if (
+    !remoteUser ||
+    !remoteUser.uid
+  ) {
     return;
   }
 
   try {
-    currentRemoteUser = remoteUser;
-    currentCallRole = "caller";
 
-    showOutgoingCall(remoteUser);
+    callFinishing =
+      false;
+
+    currentRemoteUser =
+      remoteUser;
+
+    currentCallRole =
+      "caller";
+
+    // -----------------------------------------
+    // MICROPHONE
+    // -----------------------------------------
 
     localStream =
-      await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false
-      });
+      await navigator.mediaDevices.getUserMedia(
+        {
+          audio: true,
+          video: false
+        }
+      );
+
+    // -----------------------------------------
+    // PEER CONNECTION
+    // -----------------------------------------
 
     peerConnection =
       createPeerConnection();
@@ -582,17 +914,32 @@ async function startOutgoingCall(remoteUser) {
     localStream
       .getTracks()
       .forEach(track => {
+
         peerConnection.addTrack(
           track,
           localStream
         );
+
       });
 
+    // -----------------------------------------
+    // CREATE CALL
+    // -----------------------------------------
+
     const callRef =
-      push(ref(db, "calls"));
+      push(
+        ref(
+          db,
+          "calls"
+        )
+      );
 
     currentCallId =
       callRef.key;
+
+    // -----------------------------------------
+    // CREATE OFFER
+    // -----------------------------------------
 
     const offer =
       await peerConnection.createOffer();
@@ -601,10 +948,16 @@ async function startOutgoingCall(remoteUser) {
       offer
     );
 
+    // -----------------------------------------
+    // SAVE CALL
+    // -----------------------------------------
+
     await set(
       callRef,
       {
-        callId: currentCallId,
+
+        callId:
+          currentCallId,
 
         callerId:
           currentUser.uid,
@@ -626,46 +979,78 @@ async function startOutgoingCall(remoteUser) {
         calleeEmail:
           remoteUser.email || "",
 
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp
-        },
+        offer:
+          {
+            type:
+              offer.type,
 
-        status: "ringing",
+            sdp:
+              offer.sdp
+          },
 
-        createdAt: Date.now()
+        status:
+          "ringing",
+
+        createdAt:
+          now()
+
       }
     );
+
+    // -----------------------------------------
+    // SHOW CALLING
+    // -----------------------------------------
+
+    showOutgoingCall(
+      remoteUser
+    );
+
+    startRingtone();
+
+    // -----------------------------------------
+    // LISTEN FOR ANSWER
+    // -----------------------------------------
 
     listenToCurrentCall();
 
   } catch (error) {
+
     console.error(
       "START CALL ERROR:",
       error
     );
 
-    await cleanupCall(false);
-
     alert(
-      "Could not start the call. Make sure microphone permission is allowed."
+      "Could not start the call. Please allow microphone access."
     );
+
+    await cleanupCall(
+      false
+    );
+
   }
+
 }
 
 
 // ============================================================
-// 15. CREATE PEER CONNECTION
+// 18. CREATE PEER CONNECTION
 // ============================================================
 
 function createPeerConnection() {
+
   const pc =
     new RTCPeerConnection(
       rtcConfig
     );
 
+  // -----------------------------------------
+  // LOCAL ICE CANDIDATES
+  // -----------------------------------------
+
   pc.onicecandidate =
     async event => {
+
       if (
         !event.candidate ||
         !currentCallId ||
@@ -675,6 +1060,7 @@ function createPeerConnection() {
       }
 
       try {
+
         const candidateRef =
           push(
             ref(
@@ -689,16 +1075,24 @@ function createPeerConnection() {
         );
 
       } catch (error) {
+
         console.error(
           "ICE SAVE ERROR:",
           error
         );
+
       }
+
     };
 
 
+  // -----------------------------------------
+  // REMOTE AUDIO
+  // -----------------------------------------
+
   pc.ontrack =
     event => {
+
       const audio =
         $("remoteAudio");
 
@@ -707,8 +1101,10 @@ function createPeerConnection() {
       }
 
       if (event.streams?.[0]) {
+
         audio.srcObject =
           event.streams[0];
+
       }
 
       audio.muted =
@@ -716,73 +1112,130 @@ function createPeerConnection() {
 
       audio.play()
         .catch(() => {});
+
     };
 
 
+  // -----------------------------------------
+  // CONNECTION STATE
+  // -----------------------------------------
+
   pc.onconnectionstatechange =
-    () => {
+    async () => {
+
       const state =
         pc.connectionState;
 
       console.log(
-        "WEBRTC STATE:",
+        "WEBRTC:",
         state
       );
 
-      // ======================================================
-      // THIS FIXES THE "CALLING..." PROBLEM
-      // ======================================================
+      // ---------------------------------------
+      // CONNECTED
+      // ---------------------------------------
 
-      if (state === "connected") {
+      if (
+        state ===
+        "connected"
+      ) {
+
+        stopRingtone();
+
+        showActiveCall();
 
         if (!callStartTime) {
+
           callStartTime =
-            Date.now();
+            now();
+
         }
 
         beginCallTimer();
 
-        // Make caller UI say CONNECTED.
-        showActiveCall();
+        // Make absolutely sure the caller's
+        // database status becomes connected.
+        if (
+          currentCallId
+        ) {
 
-        if ($("outgoingStatus")) {
-          $("outgoingStatus").textContent =
-            "Connected";
+          try {
+
+            await update(
+              ref(
+                db,
+                `calls/${currentCallId}`
+              ),
+              {
+
+                status:
+                  "connected",
+
+                connectedAt:
+                  now()
+
+              }
+            );
+
+          } catch (error) {
+
+            console.warn(
+              "Could not update connected status:",
+              error
+            );
+
+          }
+
         }
 
-        if ($("callStatus")) {
-          $("callStatus").textContent =
-            "Connected";
-        }
       }
 
+
+      // ---------------------------------------
+      // FAILED
+      // ---------------------------------------
 
       if (
-        state === "failed" ||
-        state === "disconnected"
+        state ===
+        "failed"
       ) {
+
         console.warn(
-          "WebRTC connection problem:",
-          state
+          "WebRTC connection failed."
         );
+
       }
 
 
-      if (state === "closed") {
-        stopCallTimer();
+      // ---------------------------------------
+      // DISCONNECTED
+      // ---------------------------------------
+
+      if (
+        state ===
+        "disconnected"
+      ) {
+
+        console.warn(
+          "WebRTC disconnected."
+        );
+
       }
+
     };
 
 
   return pc;
+
 }
 
 
 // ============================================================
-// 16. INCOMING CALL LISTENER
+// 19. INCOMING CALL LISTENER
 // ============================================================
 
 function startIncomingCallListener() {
+
   if (
     callsListenerStarted ||
     !currentUser
@@ -790,10 +1243,14 @@ function startIncomingCallListener() {
     return;
   }
 
-  callsListenerStarted = true;
+  callsListenerStarted =
+    true;
 
   const callsRef =
-    ref(db, "calls");
+    ref(
+      db,
+      "calls"
+    );
 
   incomingCallsUnsubscribe =
     onChildAdded(
@@ -807,6 +1264,7 @@ function startIncomingCallListener() {
           return;
         }
 
+        // Must be the receiver
         if (
           call.calleeId !==
           currentUser.uid
@@ -814,6 +1272,7 @@ function startIncomingCallListener() {
           return;
         }
 
+        // Only ringing calls
         if (
           call.status !==
           "ringing"
@@ -821,39 +1280,70 @@ function startIncomingCallListener() {
           return;
         }
 
-        if (
-          currentCallId
-        ) {
-          return;
-        }
-
-        if (pendingIncomingCall) {
-          return;
-        }
-
+        // Ignore very old calls
         if (call.createdAt) {
+
           const age =
-            Date.now() -
-            Number(call.createdAt);
+            now() -
+            Number(
+              call.createdAt
+            );
 
           if (age > 60000) {
             return;
           }
+
         }
 
-        showIncomingCall(call);
+        // Already busy
+        if (currentCallId) {
+          return;
+        }
+
+        // Avoid duplicate popup
+        if (
+          pendingIncomingCall?.callId ===
+          call.callId
+        ) {
+          return;
+        }
+
+        showIncomingCall(
+          call
+        );
+
       }
     );
+
 }
 
 
 // ============================================================
-// 17. LISTEN TO CURRENT CALL
+// 20. LISTEN TO CURRENT CALL
 // ============================================================
 
 function listenToCurrentCall() {
+
   if (!currentCallId) {
     return;
+  }
+
+  if (currentCallUnsubscribe) {
+
+    currentCallUnsubscribe();
+
+    currentCallUnsubscribe =
+      null;
+
+  }
+
+  if (currentCandidateUnsubscribe) {
+
+    currentCandidateUnsubscribe();
+
+    currentCandidateUnsubscribe =
+      null;
+
   }
 
   const callId =
@@ -865,7 +1355,12 @@ function listenToCurrentCall() {
       `calls/${callId}`
     );
 
-  const unsubscribe =
+
+  // -----------------------------------------
+  // CALL STATUS / ANSWER
+  // -----------------------------------------
+
+  currentCallUnsubscribe =
     onValue(
       callRef,
       async snapshot => {
@@ -878,145 +1373,202 @@ function listenToCurrentCall() {
         }
 
 
-        // ====================================================
-        // CALLER RECEIVES ANSWER
-        // ====================================================
+        // =====================================
+        // CALLER GETS ANSWER
+        // =====================================
 
         if (
-          currentCallRole === "caller" &&
+          currentCallRole ===
+          "caller" &&
           call.answer &&
           peerConnection &&
           !peerConnection.currentRemoteDescription
         ) {
 
           try {
+
             await peerConnection.setRemoteDescription(
               new RTCSessionDescription(
                 call.answer
               )
             );
 
+            // Very important:
+            // once answer exists, the call is no
+            // longer just "Calling".
+            stopRingtone();
+
+            $("outgoingStatus").textContent =
+              "Connecting...";
+
             await addStoredCandidates();
 
           } catch (error) {
+
             console.error(
               "SET ANSWER ERROR:",
               error
             );
+
           }
+
         }
 
 
-        // ====================================================
-        // IMPORTANT:
-        // FIREBASE SAYS CONNECTED
-        // ====================================================
+        // =====================================
+        // CALLER STATUS CONNECTED
+        // =====================================
 
         if (
-          call.status === "connected" &&
-          currentCallRole === "caller"
+          currentCallRole ===
+          "caller" &&
+          call.status ===
+          "connected"
         ) {
+
+          stopRingtone();
+
+          $("outgoingStatus").textContent =
+            "Connected";
 
           showActiveCall();
 
-          if ($("outgoingStatus")) {
-            $("outgoingStatus").textContent =
-              "Connected";
-          }
-
           if (!callStartTime) {
+
             callStartTime =
-              Number(
-                call.answeredAt
-              ) || Date.now();
+              now();
+
+            beginCallTimer();
+
           }
 
-          beginCallTimer();
         }
 
 
-        // ====================================================
+        // =====================================
         // MISSED CALL
-        // ====================================================
+        // =====================================
 
         if (
-          call.status === "missed"
+          call.status ===
+          "missed"
         ) {
 
-          if (
-            currentCallRole === "caller"
-          ) {
-            hideAllCallOverlays();
-          }
+          stopRingtone();
 
-          await cleanupCall(false);
-          return;
+          await cleanupCall(
+            false
+          );
+
         }
 
 
-        // ====================================================
+        // =====================================
         // REJECTED
-        // ====================================================
+        // =====================================
 
         if (
-          call.status === "rejected"
+          call.status ===
+          "rejected"
         ) {
 
-          if (
-            currentCallRole === "caller"
-          ) {
+          stopRingtone();
 
-            if ($("outgoingStatus")) {
-              $("outgoingStatus").textContent =
-                "Call rejected";
-            }
+          await cleanupCall(
+            false
+          );
 
-            setTimeout(
-              () => {
-                cleanupCall(false);
-              },
-              1000
-            );
-          }
-
-          return;
         }
 
 
-        // ====================================================
-        // CANCELLED
-        // ====================================================
-
-        if (
-          call.status === "cancelled"
-        ) {
-          await cleanupCall(false);
-          return;
-        }
-
-
-        // ====================================================
+        // =====================================
         // ENDED
-        // ====================================================
+        // =====================================
 
         if (
-          call.status === "ended"
+          call.status ===
+          "ended"
         ) {
 
-          await cleanupCall(false);
-          return;
+          stopRingtone();
+
+          await cleanupCall(
+            false
+          );
+
         }
+
       }
     );
 
-  callUnsubscribers.push(
-    unsubscribe
-  );
+
+  // -----------------------------------------
+  // LIVE ICE CANDIDATES
+  // -----------------------------------------
+
+  const candidatesRef =
+    ref(
+      db,
+      `calls/${callId}/candidates`
+    );
+
+  currentCandidateUnsubscribe =
+    onChildAdded(
+      candidatesRef,
+      async snapshot => {
+
+        const candidateOwner =
+          snapshot.key;
+
+        if (
+          candidateOwner ===
+          currentUser?.uid
+        ) {
+          return;
+        }
+
+        const candidates =
+          snapshot.val();
+
+        if (
+          !candidates ||
+          !peerConnection
+        ) {
+          return;
+        }
+
+        for (
+          const key
+          of Object.keys(candidates)
+        ) {
+
+          try {
+
+            await peerConnection.addIceCandidate(
+              new RTCIceCandidate(
+                candidates[key]
+              )
+            );
+
+          } catch (error) {
+
+            console.warn(
+              "LIVE ICE ERROR:",
+              error
+            );
+
+          }
+
+        }
+
+      }
+    );
+
 }
 
 
 // ============================================================
-// 18. ACCEPT INCOMING CALL
+// 21. ACCEPT INCOMING CALL
 // ============================================================
 
 $("acceptCallBtn")?.addEventListener(
@@ -1026,6 +1578,7 @@ $("acceptCallBtn")?.addEventListener(
 
 
 async function acceptIncomingCall() {
+
   const call =
     pendingIncomingCall;
 
@@ -1034,31 +1587,48 @@ async function acceptIncomingCall() {
   }
 
   try {
+
+    stopRingtone();
+
     currentCallId =
       call.callId;
 
     currentCallRole =
       "callee";
 
-    currentRemoteUser = {
-      uid: call.callerId,
+    currentRemoteUser =
+      {
 
-      name:
-        call.callerName ||
-        call.callerEmail ||
-        "User",
+        uid:
+          call.callerId,
 
-      email:
-        call.callerEmail || ""
-    };
+        name:
+          call.callerName ||
+          call.callerEmail ||
+          "User",
 
+        email:
+          call.callerEmail || ""
+
+      };
+
+
+    // -----------------------------------------
+    // MICROPHONE
+    // -----------------------------------------
 
     localStream =
-      await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false
-      });
+      await navigator.mediaDevices.getUserMedia(
+        {
+          audio: true,
+          video: false
+        }
+      );
 
+
+    // -----------------------------------------
+    // PEER
+    // -----------------------------------------
 
     peerConnection =
       createPeerConnection();
@@ -1067,12 +1637,18 @@ async function acceptIncomingCall() {
     localStream
       .getTracks()
       .forEach(track => {
+
         peerConnection.addTrack(
           track,
           localStream
         );
+
       });
 
+
+    // -----------------------------------------
+    // REMOTE OFFER
+    // -----------------------------------------
 
     await peerConnection.setRemoteDescription(
       new RTCSessionDescription(
@@ -1081,14 +1657,21 @@ async function acceptIncomingCall() {
     );
 
 
+    // -----------------------------------------
+    // ANSWER
+    // -----------------------------------------
+
     const answer =
       await peerConnection.createAnswer();
-
 
     await peerConnection.setLocalDescription(
       answer
     );
 
+
+    // -----------------------------------------
+    // UPDATE CALL
+    // -----------------------------------------
 
     await update(
       ref(
@@ -1096,41 +1679,52 @@ async function acceptIncomingCall() {
         `calls/${call.callId}`
       ),
       {
-        answer: {
-          type: answer.type,
-          sdp: answer.sdp
-        },
 
-        status: "connected",
+        answer:
+          {
+            type:
+              answer.type,
+
+            sdp:
+              answer.sdp
+          },
+
+        status:
+          "connected",
 
         answeredAt:
-          Date.now()
+          now()
+
       }
     );
 
 
-    pendingIncomingCall =
-      null;
-
+    // -----------------------------------------
+    // UI
+    // -----------------------------------------
 
     hide(
       $("incomingOverlay")
     );
 
-
     showActiveCall();
 
-
     callStartTime =
-      Date.now();
+      now();
 
     beginCallTimer();
 
+    pendingIncomingCall =
+      null;
 
-    await addStoredCandidates();
 
+    // -----------------------------------------
+    // LISTEN
+    // -----------------------------------------
 
     listenToCurrentCall();
+
+    await addStoredCandidates();
 
   } catch (error) {
 
@@ -1139,17 +1733,25 @@ async function acceptIncomingCall() {
       error
     );
 
-    await rejectCurrentIncomingCall();
-
     alert(
-      "Could not accept the call. Check microphone permission."
+      "Could not accept the call. Please make sure microphone permission is allowed."
     );
+
+    await rejectIncomingCallById(
+      call.callId
+    );
+
+    await cleanupCall(
+      false
+    );
+
   }
+
 }
 
 
 // ============================================================
-// 19. REJECT INCOMING CALL
+// 22. REJECT INCOMING CALL
 // ============================================================
 
 $("rejectCallBtn")?.addEventListener(
@@ -1159,13 +1761,68 @@ $("rejectCallBtn")?.addEventListener(
 
 
 async function rejectCurrentIncomingCall() {
+
   const call =
     pendingIncomingCall;
 
   if (!call) {
+
     hide(
       $("incomingOverlay")
     );
+
+    return;
+  }
+
+  stopRingtone();
+
+  await rejectIncomingCallById(
+    call.callId
+  );
+
+  await saveHistoryForUser(
+    currentUser.uid,
+    call.callId,
+    {
+
+      remoteUid:
+        call.callerId,
+
+      remoteName:
+        call.callerName ||
+        call.callerEmail ||
+        "User",
+
+      remoteEmail:
+        call.callerEmail || "",
+
+      status:
+        "rejected",
+
+      duration:
+        0,
+
+      timestamp:
+        now()
+
+    }
+  );
+
+  pendingIncomingCall =
+    null;
+
+  hide(
+    $("incomingOverlay")
+  );
+
+}
+
+
+async function rejectIncomingCallById(
+  callId
+) {
+
+  if (!callId) {
     return;
   }
 
@@ -1174,60 +1831,33 @@ async function rejectCurrentIncomingCall() {
     await update(
       ref(
         db,
-        `calls/${call.callId}`
+        `calls/${callId}`
       ),
       {
-        status: "rejected",
-        endedAt: Date.now()
-      }
-    );
-
-
-    await saveHistoryForUser(
-      currentUser.uid,
-      call.callId,
-      {
-        remoteUid:
-          call.callerId,
-
-        remoteName:
-          call.callerName ||
-          call.callerEmail ||
-          "User",
-
-        remoteEmail:
-          call.callerEmail || "",
 
         status:
           "rejected",
 
-        duration: 0,
+        endedAt:
+          now()
 
-        timestamp:
-          Date.now()
       }
     );
 
   } catch (error) {
 
     console.error(
-      "REJECT ERROR:",
+      "REJECT CALL ERROR:",
       error
     );
+
   }
 
-
-  pendingIncomingCall =
-    null;
-
-  hide(
-    $("incomingOverlay")
-  );
 }
 
 
 // ============================================================
-// 20. CANCEL OUTGOING CALL
+// 23. CANCEL OUTGOING CALL
 // ============================================================
 
 $("cancelCallBtn")?.addEventListener(
@@ -1242,10 +1872,13 @@ async function cancelOutgoingCall() {
     currentCallId;
 
   if (!callId) {
-    await cleanupCall(false);
+
+    await cleanupCall(
+      false
+    );
+
     return;
   }
-
 
   try {
 
@@ -1263,13 +1896,14 @@ async function cancelOutgoingCall() {
         : null;
 
 
-    // ========================================================
-    // CALLER CANCELS BEFORE PERSON ANSWERS
-    // ========================================================
+    // =========================================
+    // STILL RINGING = MISSED CALL
+    // =========================================
 
     if (
       call &&
-      call.status === "ringing"
+      call.status ===
+      "ringing"
     ) {
 
       await update(
@@ -1278,17 +1912,26 @@ async function cancelOutgoingCall() {
           `calls/${callId}`
         ),
         {
-          status: "missed",
-          endedAt: Date.now()
+
+          status:
+            "missed",
+
+          endedAt:
+            now()
+
         }
       );
 
 
-      // The person being called gets MISSED CALL.
+      // ---------------------------------------
+      // RECEIVER GETS MISSED CALL
+      // ---------------------------------------
+
       await saveHistoryForUser(
         call.calleeId,
         callId,
         {
+
           remoteUid:
             call.callerId,
 
@@ -1303,19 +1946,25 @@ async function cancelOutgoingCall() {
           status:
             "missed",
 
-          duration: 0,
+          duration:
+            0,
 
           timestamp:
-            Date.now()
+            now()
+
         }
       );
 
 
-      // Caller gets CANCELLED.
+      // ---------------------------------------
+      // CALLER GETS CANCELLED
+      // ---------------------------------------
+
       await saveHistoryForUser(
         call.callerId,
         callId,
         {
+
           remoteUid:
             call.calleeId,
 
@@ -1330,19 +1979,16 @@ async function cancelOutgoingCall() {
           status:
             "cancelled",
 
-          duration: 0,
+          duration:
+            0,
 
           timestamp:
-            Date.now()
+            now()
+
         }
       );
 
-
     } else {
-
-      // ======================================================
-      // CALL WAS ALREADY ANSWERED
-      // ======================================================
 
       await update(
         ref(
@@ -1350,27 +1996,36 @@ async function cancelOutgoingCall() {
           `calls/${callId}`
         ),
         {
-          status: "ended",
-          endedAt: Date.now()
+
+          status:
+            "ended",
+
+          endedAt:
+            now()
+
         }
       );
+
     }
 
   } catch (error) {
 
     console.error(
-      "CANCEL CALL ERROR:",
+      "CANCEL ERROR:",
       error
     );
+
   }
 
+  await cleanupCall(
+    false
+  );
 
-  await cleanupCall(false);
 }
 
 
 // ============================================================
-// 21. END ACTIVE CALL
+// 24. END ACTIVE CALL
 // ============================================================
 
 $("endCallBtn")?.addEventListener(
@@ -1381,18 +2036,27 @@ $("endCallBtn")?.addEventListener(
 
 async function endCall() {
 
+  if (callFinishing) {
+    return;
+  }
+
+  callFinishing =
+    true;
+
   const callId =
     currentCallId;
 
   if (!callId) {
-    await cleanupCall(false);
+
+    await cleanupCall(
+      false
+    );
+
+    callFinishing =
+      false;
+
     return;
   }
-
-
-  const duration =
-    getCallDuration();
-
 
   try {
 
@@ -1416,21 +2080,27 @@ async function endCall() {
         `calls/${callId}`
       ),
       {
-        status: "ended",
-        endedAt: Date.now()
+
+        status:
+          "ended",
+
+        endedAt:
+          now()
+
       }
     );
 
 
     if (call) {
 
-      // Save history for current user.
       await saveHistoryForUser(
         currentUser.uid,
         callId,
         {
+
           remoteUid:
-            currentRemoteUser?.uid || "",
+            currentRemoteUser?.uid ||
+            "",
 
           remoteName:
             currentRemoteUser?.name ||
@@ -1441,68 +2111,18 @@ async function endCall() {
             currentRemoteUser?.email ||
             "",
 
-          status: "ended",
+          status:
+            "ended",
 
-          duration,
+          duration:
+            getCallDuration(),
 
           timestamp:
-            Date.now()
+            now()
+
         }
       );
 
-
-      // Save history for the other person too.
-      const otherUserId =
-        currentUser.uid === call.callerId
-          ? call.calleeId
-          : call.callerId;
-
-
-      const otherName =
-        currentUser.uid === call.callerId
-          ? (
-              call.callerName ||
-              call.callerEmail ||
-              "User"
-            )
-          : (
-              call.calleeName ||
-              call.calleeEmail ||
-              "User"
-            );
-
-
-      const otherEmail =
-        currentUser.uid === call.callerId
-          ? (
-              call.callerEmail || ""
-            )
-          : (
-              call.calleeEmail || ""
-            );
-
-
-      await saveHistoryForUser(
-        otherUserId,
-        callId,
-        {
-          remoteUid:
-            currentUser.uid,
-
-          remoteName:
-            getCurrentUserName(),
-
-          remoteEmail:
-            currentUser.email || "",
-
-          status: "ended",
-
-          duration,
-
-          timestamp:
-            Date.now()
-        }
-      );
     }
 
   } catch (error) {
@@ -1511,27 +2131,33 @@ async function endCall() {
       "END CALL ERROR:",
       error
     );
+
   }
 
+  await cleanupCall(
+    false
+  );
 
-  await cleanupCall(false);
+  callFinishing =
+    false;
+
 }
 
 
 // ============================================================
-// 22. CALL TIMER
+// 25. CALL TIMER
 // ============================================================
 
 function beginCallTimer() {
 
   if (!callStartTime) {
+
     callStartTime =
-      Date.now();
+      now();
+
   }
 
-
   stopCallTimer();
-
 
   callTimerInterval =
     setInterval(
@@ -1539,8 +2165,8 @@ function beginCallTimer() {
       1000
     );
 
-
   updateCallTimer();
+
 }
 
 
@@ -1553,19 +2179,11 @@ function updateCallTimer() {
     return;
   }
 
-
-  if (!callStartTime) {
-    timer.textContent =
-      "00:00";
-
-    return;
-  }
-
-
   timer.textContent =
     formatDuration(
       getCallDuration()
     );
+
 }
 
 
@@ -1577,10 +2195,11 @@ function getCallDuration() {
 
   return Math.floor(
     (
-      Date.now() -
+      now() -
       callStartTime
     ) / 1000
   );
+
 }
 
 
@@ -1594,12 +2213,14 @@ function stopCallTimer() {
 
     callTimerInterval =
       null;
+
   }
+
 }
 
 
 // ============================================================
-// 23. MUTE
+// 26. MUTE
 // ============================================================
 
 $("muteBtn")?.addEventListener(
@@ -1613,27 +2234,26 @@ $("muteBtn")?.addEventListener(
     isMuted =
       !isMuted;
 
-
     localStream
       .getAudioTracks()
       .forEach(track => {
+
         track.enabled =
           !isMuted;
+
       });
 
+    $("muteBtn").textContent =
+      isMuted
+        ? "🔇 Unmute"
+        : "🎤 Mute";
 
-    if ($("muteBtn")) {
-      $("muteBtn").textContent =
-        isMuted
-          ? "🔇 Unmute"
-          : "🎤 Mute";
-    }
   }
 );
 
 
 // ============================================================
-// 24. SPEAKER
+// 27. SPEAKER
 // ============================================================
 
 $("speakerBtn")?.addEventListener(
@@ -1647,27 +2267,30 @@ $("speakerBtn")?.addEventListener(
       return;
     }
 
-
     isSpeakerOn =
       !isSpeakerOn;
-
 
     audio.muted =
       !isSpeakerOn;
 
+    $("speakerBtn").textContent =
+      isSpeakerOn
+        ? "🔊 Speaker"
+        : "🔇 Speaker";
 
-    if ($("speakerBtn")) {
-      $("speakerBtn").textContent =
-        isSpeakerOn
-          ? "🔊 Speaker"
-          : "🔇 Speaker";
+    if (isSpeakerOn) {
+
+      audio.play()
+        .catch(() => {});
+
     }
+
   }
 );
 
 
 // ============================================================
-// 25. ADD STORED ICE CANDIDATES
+// 28. ADD STORED ICE CANDIDATES
 // ============================================================
 
 async function addStoredCandidates() {
@@ -1680,7 +2303,6 @@ async function addStoredCandidates() {
     return;
   }
 
-
   try {
 
     const candidatesRef =
@@ -1689,22 +2311,21 @@ async function addStoredCandidates() {
         `calls/${currentCallId}/candidates`
       );
 
-
     const snapshot =
-      await get(candidatesRef);
-
+      await get(
+        candidatesRef
+      );
 
     if (!snapshot.exists()) {
       return;
     }
 
-
     const allCandidates =
       snapshot.val();
 
-
     for (
-      const userId in allCandidates
+      const userId
+      of Object.keys(allCandidates)
     ) {
 
       if (
@@ -1714,13 +2335,12 @@ async function addStoredCandidates() {
         continue;
       }
 
-
       const candidates =
         allCandidates[userId];
 
-
       for (
-        const key in candidates
+        const key
+        of Object.keys(candidates || {})
       ) {
 
         try {
@@ -1734,11 +2354,14 @@ async function addStoredCandidates() {
         } catch (error) {
 
           console.warn(
-            "ICE ADD ERROR:",
+            "STORED ICE ERROR:",
             error
           );
+
         }
+
       }
+
     }
 
   } catch (error) {
@@ -1747,33 +2370,36 @@ async function addStoredCandidates() {
       "CANDIDATE LOAD ERROR:",
       error
     );
+
   }
+
 }
 
 
 // ============================================================
-// 26. HISTORY LISTENER
+// 29. HISTORY LISTENER
 // ============================================================
 
 function startHistoryListener() {
 
   if (historyUnsubscribe) {
-    historyUnsubscribe();
-    historyUnsubscribe = null;
-  }
 
+    historyUnsubscribe();
+
+    historyUnsubscribe =
+      null;
+
+  }
 
   if (!currentUser) {
     return;
   }
-
 
   const historyRef =
     ref(
       db,
       `callHistory/${currentUser.uid}`
     );
-
 
   historyUnsubscribe =
     onValue(
@@ -1793,18 +2419,24 @@ function startHistoryListener() {
         );
 
         if ($("historyList")) {
+
           $("historyList").innerHTML =
-            `<p class="empty">
+            `
+            <p class="empty">
               Unable to load call history.
-            </p>`;
+            </p>
+            `;
+
         }
+
       }
     );
+
 }
 
 
 // ============================================================
-// 27. RENDER HISTORY
+// 30. RENDER HISTORY
 // ============================================================
 
 function renderHistory(history) {
@@ -1816,22 +2448,28 @@ function renderHistory(history) {
     return;
   }
 
-
   const entries =
     Object.values(history)
+
       .sort(
         (a, b) =>
-          Number(b.timestamp || 0) -
-          Number(a.timestamp || 0)
+          Number(
+            b.timestamp || 0
+          ) -
+          Number(
+            a.timestamp || 0
+          )
       );
 
 
   if (!entries.length) {
 
     container.innerHTML =
-      `<p class="empty">
+      `
+      <p class="empty">
         No call history yet.
-      </p>`;
+      </p>
+      `;
 
     return;
   }
@@ -1846,11 +2484,9 @@ function renderHistory(history) {
           item.remoteEmail ||
           "User";
 
-
         const status =
           item.status ||
           "ended";
-
 
         let statusText =
           "📞 Completed";
@@ -1860,7 +2496,8 @@ function renderHistory(history) {
 
 
         if (
-          status === "missed"
+          status ===
+          "missed"
         ) {
 
           statusText =
@@ -1869,8 +2506,11 @@ function renderHistory(history) {
           statusClass =
             "missed";
 
-        } else if (
-          status === "cancelled"
+        }
+
+        else if (
+          status ===
+          "cancelled"
         ) {
 
           statusText =
@@ -1879,8 +2519,11 @@ function renderHistory(history) {
           statusClass =
             "rejected";
 
-        } else if (
-          status === "rejected"
+        }
+
+        else if (
+          status ===
+          "rejected"
         ) {
 
           statusText =
@@ -1888,36 +2531,46 @@ function renderHistory(history) {
 
           statusClass =
             "rejected";
+
         }
 
 
         const date =
           item.timestamp
             ? new Date(
-                Number(item.timestamp)
+                Number(
+                  item.timestamp
+                )
               ).toLocaleString()
             : "";
 
 
         return `
+
           <div class="history-item">
 
             <div class="avatar">
+
               ${escapeText(
                 getInitials(name)
               )}
+
             </div>
 
             <div class="history-info">
 
               <div class="history-name">
+
                 ${escapeText(name)}
+
               </div>
 
               <div class="history-email">
+
                 ${escapeText(
                   item.remoteEmail || ""
                 )}
+
               </div>
 
               <div class="history-meta">
@@ -1925,33 +2578,43 @@ function renderHistory(history) {
                 <span
                   class="history-status ${statusClass}"
                 >
+
                   ${statusText}
+
                 </span>
 
-                <span class="history-duration">
+                <span
+                  class="history-duration"
+                >
+
                   ${formatDuration(
                     item.duration || 0
                   )}
+
                 </span>
 
               </div>
 
               <div class="history-email">
+
                 ${escapeText(date)}
+
               </div>
 
             </div>
 
           </div>
+
         `;
 
       })
       .join("");
+
 }
 
 
 // ============================================================
-// 28. SAVE HISTORY
+// 31. SAVE HISTORY
 // ============================================================
 
 async function saveHistoryForUser(
@@ -1960,10 +2623,12 @@ async function saveHistoryForUser(
   data
 ) {
 
-  if (!uid || !callId) {
+  if (
+    !uid ||
+    !callId
+  ) {
     return;
   }
-
 
   try {
 
@@ -1973,26 +2638,34 @@ async function saveHistoryForUser(
         `callHistory/${uid}/${callId}`
       ),
       {
-        callId,
+
+        callId:
+          callId,
 
         remoteUid:
           data.remoteUid || "",
 
         remoteName:
-          data.remoteName || "User",
+          data.remoteName ||
+          "User",
 
         remoteEmail:
           data.remoteEmail || "",
 
         status:
-          data.status || "ended",
+          data.status ||
+          "ended",
 
         duration:
-          Number(data.duration) || 0,
+          Number(
+            data.duration
+          ) || 0,
 
         timestamp:
-          Number(data.timestamp) ||
-          Date.now()
+          Number(
+            data.timestamp
+          ) || now()
+
       }
     );
 
@@ -2002,12 +2675,33 @@ async function saveHistoryForUser(
       "SAVE HISTORY ERROR:",
       error
     );
+
   }
+
 }
 
 
 // ============================================================
-// 29. OUTGOING CALL UI
+// 32. CURRENT USER NAME
+// ============================================================
+
+function getCurrentUserName() {
+
+  if (!currentUser) {
+    return "User";
+  }
+
+  return (
+    currentUser.displayName ||
+    currentUser.email?.split("@")[0] ||
+    "User"
+  );
+
+}
+
+
+// ============================================================
+// 33. OUTGOING UI
 // ============================================================
 
 function showOutgoingCall(user) {
@@ -2017,41 +2711,24 @@ function showOutgoingCall(user) {
     user.email ||
     "User";
 
+  $("outgoingName").textContent =
+    name;
 
-  if ($("outgoingName")) {
-    $("outgoingName").textContent =
-      name;
-  }
+  $("outgoingStatus").textContent =
+    "Calling...";
 
-
-  if ($("outgoingStatus")) {
-    $("outgoingStatus").textContent =
-      "Calling...";
-  }
-
-
-  if ($("outgoingAvatar")) {
-    $("outgoingAvatar").textContent =
-      getInitials(name);
-  }
-
+  $("outgoingAvatar").textContent =
+    getInitials(name);
 
   show(
     $("outgoingOverlay")
   );
 
-  hide(
-    $("activeCallOverlay")
-  );
-
-  hide(
-    $("incomingOverlay")
-  );
 }
 
 
 // ============================================================
-// 30. INCOMING CALL UI
+// 34. INCOMING UI
 // ============================================================
 
 function showIncomingCall(call) {
@@ -2059,33 +2736,33 @@ function showIncomingCall(call) {
   pendingIncomingCall =
     call;
 
-
   const name =
     call.callerName ||
     call.callerEmail ||
     "User";
 
+  $("incomingName").textContent =
+    name;
 
-  if ($("incomingName")) {
-    $("incomingName").textContent =
-      name;
-  }
-
-
-  if ($("incomingAvatar")) {
-    $("incomingAvatar").textContent =
-      getInitials(name);
-  }
-
+  $("incomingAvatar").textContent =
+    getInitials(name);
 
   show(
     $("incomingOverlay")
   );
+
+  startRingtone();
+
+  sendBrowserNotification(
+    "Incoming Voice Call",
+    `${name} is calling you.`
+  );
+
 }
 
 
 // ============================================================
-// 31. ACTIVE CALL UI
+// 35. ACTIVE CALL UI
 // ============================================================
 
 function showActiveCall() {
@@ -2095,24 +2772,14 @@ function showActiveCall() {
     currentRemoteUser?.email ||
     "User";
 
+  $("activeName").textContent =
+    name;
 
-  if ($("activeName")) {
-    $("activeName").textContent =
-      name;
-  }
+  $("activeAvatar").textContent =
+    getInitials(name);
 
-
-  if ($("activeAvatar")) {
-    $("activeAvatar").textContent =
-      getInitials(name);
-  }
-
-
-  if ($("callStatus")) {
-    $("callStatus").textContent =
-      "Connected";
-  }
-
+  $("callStatus").textContent =
+    "Connected";
 
   show(
     $("activeCallOverlay")
@@ -2125,11 +2792,12 @@ function showActiveCall() {
   hide(
     $("incomingOverlay")
   );
+
 }
 
 
 // ============================================================
-// 32. HIDE ALL CALL WINDOWS
+// 36. HIDE CALL OVERLAYS
 // ============================================================
 
 function hideAllCallOverlays() {
@@ -2145,11 +2813,12 @@ function hideAllCallOverlays() {
   hide(
     $("activeCallOverlay")
   );
+
 }
 
 
 // ============================================================
-// 33. CLEANUP CALL
+// 37. CLEANUP
 // ============================================================
 
 async function cleanupCall(
@@ -2159,6 +2828,10 @@ async function cleanupCall(
   const callId =
     currentCallId;
 
+
+  // -----------------------------------------
+  // DATABASE
+  // -----------------------------------------
 
   if (
     updateDatabase &&
@@ -2173,8 +2846,13 @@ async function cleanupCall(
           `calls/${callId}`
         ),
         {
-          status: "ended",
-          endedAt: Date.now()
+
+          status:
+            "ended",
+
+          endedAt:
+            now()
+
         }
       );
 
@@ -2184,27 +2862,61 @@ async function cleanupCall(
         "CLEANUP DATABASE ERROR:",
         error
       );
+
     }
+
   }
 
+
+  // -----------------------------------------
+  // RINGTONE
+  // -----------------------------------------
+
+  stopRingtone();
+
+
+  // -----------------------------------------
+  // TIMER
+  // -----------------------------------------
 
   stopCallTimer();
 
 
-  callUnsubscribers
-    .forEach(
-      unsubscribe => {
+  // -----------------------------------------
+  // CALL LISTENER
+  // -----------------------------------------
 
-        try {
-          unsubscribe();
-        } catch (_) {}
+  if (currentCallUnsubscribe) {
 
-      }
-    );
+    try {
+      currentCallUnsubscribe();
+    } catch (_) {}
+
+    currentCallUnsubscribe =
+      null;
+
+  }
 
 
-  callUnsubscribers = [];
+  // -----------------------------------------
+  // ICE LISTENER
+  // -----------------------------------------
 
+  if (currentCandidateUnsubscribe) {
+
+    try {
+      currentCandidateUnsubscribe();
+    } catch (_) {}
+
+    currentCandidateUnsubscribe =
+      null;
+
+  }
+
+
+  // -----------------------------------------
+  // LOCAL AUDIO
+  // -----------------------------------------
 
   if (localStream) {
 
@@ -2213,69 +2925,114 @@ async function cleanupCall(
       .forEach(track => {
 
         try {
+
           track.stop();
+
         } catch (_) {}
 
       });
 
-    localStream = null;
+    localStream =
+      null;
+
   }
 
+
+  // -----------------------------------------
+  // PEER CONNECTION
+  // -----------------------------------------
 
   if (peerConnection) {
 
     try {
+
       peerConnection.close();
+
     } catch (_) {}
 
-    peerConnection = null;
+    peerConnection =
+      null;
+
   }
 
+
+  // -----------------------------------------
+  // AUDIO
+  // -----------------------------------------
 
   const audio =
     $("remoteAudio");
 
-
   if (audio) {
 
-    audio.srcObject = null;
-    audio.muted = false;
+    audio.srcObject =
+      null;
+
+    audio.muted =
+      false;
+
   }
 
 
-  currentCallId = null;
-  currentCallRole = null;
-  currentRemoteUser = null;
+  // -----------------------------------------
+  // STATE
+  // -----------------------------------------
 
-  pendingIncomingCall = null;
+  currentCallId =
+    null;
 
-  callStartTime = null;
+  currentCallRole =
+    null;
 
-  isMuted = false;
-  isSpeakerOn = true;
+  currentRemoteUser =
+    null;
 
+  pendingIncomingCall =
+    null;
+
+  callStartTime =
+    null;
+
+  isMuted =
+    false;
+
+  isSpeakerOn =
+    true;
+
+
+  // -----------------------------------------
+  // BUTTONS
+  // -----------------------------------------
 
   if ($("muteBtn")) {
+
     $("muteBtn").textContent =
       "🎤 Mute";
-  }
 
+  }
 
   if ($("speakerBtn")) {
+
     $("speakerBtn").textContent =
       "🔊 Speaker";
+
   }
 
 
+  // -----------------------------------------
+  // UI
+  // -----------------------------------------
+
   hideAllCallOverlays();
+
 }
 
 
 // ============================================================
-// 34. STOP LISTENERS
+// 38. STOP ALL LISTENERS
 // ============================================================
 
-function stopListeners() {
+function stopAllListeners() {
 
   if (usersUnsubscribe) {
 
@@ -2283,7 +3040,9 @@ function stopListeners() {
       usersUnsubscribe();
     } catch (_) {}
 
-    usersUnsubscribe = null;
+    usersUnsubscribe =
+      null;
+
   }
 
 
@@ -2293,7 +3052,9 @@ function stopListeners() {
       historyUnsubscribe();
     } catch (_) {}
 
-    historyUnsubscribe = null;
+    historyUnsubscribe =
+      null;
+
   }
 
 
@@ -2303,50 +3064,246 @@ function stopListeners() {
       incomingCallsUnsubscribe();
     } catch (_) {}
 
-    incomingCallsUnsubscribe = null;
+    incomingCallsUnsubscribe =
+      null;
+
   }
 
 
-  callUnsubscribers
-    .forEach(
-      unsubscribe => {
+  if (currentCallUnsubscribe) {
 
-        try {
-          unsubscribe();
-        } catch (_) {}
+    try {
+      currentCallUnsubscribe();
+    } catch (_) {}
 
-      }
-    );
+    currentCallUnsubscribe =
+      null;
+
+  }
 
 
-  callUnsubscribers = [];
+  if (currentCandidateUnsubscribe) {
 
-  callsListenerStarted = false;
+    try {
+      currentCandidateUnsubscribe();
+    } catch (_) {}
+
+    currentCandidateUnsubscribe =
+      null;
+
+  }
+
+
+  callsListenerStarted =
+    false;
+
 }
 
 
 // ============================================================
-// 35. REFRESH HISTORY
+// 39. REFRESH HISTORY
 // ============================================================
 
 $("refreshHistoryBtn")?.addEventListener(
   "click",
   () => {
+
     startHistoryListener();
+
   }
 );
 
 
 // ============================================================
-// 36. PAGE CLOSE
+// 40. NOTIFICATIONS
+// ============================================================
+
+async function requestNotifications() {
+
+  if (
+    !("Notification" in window)
+  ) {
+
+    alert(
+      "This browser does not support notifications."
+    );
+
+    return;
+
+  }
+
+  try {
+
+    const permission =
+      await Notification.requestPermission();
+
+    if (
+      permission ===
+      "granted"
+    ) {
+
+      $("notificationBtn").textContent =
+        "🔔 Notifications Enabled";
+
+      sendBrowserNotification(
+        "VoiceChat",
+        "Notifications are now enabled."
+      );
+
+    }
+
+    else if (
+      permission ===
+      "denied"
+    ) {
+
+      alert(
+        "Notifications were denied. You need to allow notifications in your browser settings."
+      );
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "NOTIFICATION ERROR:",
+      error
+    );
+
+  }
+
+}
+
+
+function sendBrowserNotification(
+  title,
+  body
+) {
+
+  if (
+    !("Notification" in window)
+  ) {
+    return;
+  }
+
+  if (
+    Notification.permission !==
+    "granted"
+  ) {
+    return;
+  }
+
+  try {
+
+    new Notification(
+      title,
+      {
+        body:
+          body,
+
+        icon:
+          "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📞</text></svg>"
+      }
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Could not create notification:",
+      error
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// 41. CHECK NOTIFICATION STATE
+// ============================================================
+
+function updateNotificationButton() {
+
+  const button =
+    $("notificationBtn");
+
+  if (!button) {
+    return;
+  }
+
+  if (
+    !("Notification" in window)
+  ) {
+
+    button.textContent =
+      "🔕 Notifications Unsupported";
+
+    return;
+
+  }
+
+  if (
+    Notification.permission ===
+    "granted"
+  ) {
+
+    button.textContent =
+      "🔔 Notifications Enabled";
+
+  }
+
+  else if (
+    Notification.permission ===
+    "denied"
+  ) {
+
+    button.textContent =
+      "🔕 Notifications Blocked";
+
+  }
+
+  else {
+
+    button.textContent =
+      "🔔 Enable Notifications";
+
+  }
+
+}
+
+
+// ============================================================
+// 42. PAGE VISIBILITY
+// ============================================================
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+
+    if (
+      document.visibilityState ===
+      "visible"
+    ) {
+
+      updateNotificationButton();
+
+    }
+
+  }
+);
+
+
+// ============================================================
+// 43. PAGE CLOSE
 // ============================================================
 
 window.addEventListener(
   "beforeunload",
   () => {
 
-    stopCallTimer();
+    stopRingtone();
 
+    stopCallTimer();
 
     if (localStream) {
 
@@ -2359,8 +3316,8 @@ window.addEventListener(
           } catch (_) {}
 
         });
-    }
 
+    }
 
     if (peerConnection) {
 
@@ -2369,14 +3326,17 @@ window.addEventListener(
       } catch (_) {}
 
     }
+
   }
 );
 
 
 // ============================================================
-// 37. STARTUP
+// 44. STARTUP
 // ============================================================
 
+updateNotificationButton();
+
 console.log(
-  "✅ VoiceChat app.js loaded successfully."
+  "✅ VoiceChat loaded successfully."
 );
