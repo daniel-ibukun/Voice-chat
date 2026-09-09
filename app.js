@@ -44,26 +44,13 @@ import {
 
 const firebaseConfig = {
 
-  apiKey:
-    "YOUR_API_KEY",
-
-  authDomain:
-    "YOUR_PROJECT.firebaseapp.com",
-
-  databaseURL:
-    "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-
-  projectId:
-    "YOUR_PROJECT_ID",
-
-  storageBucket:
-    "YOUR_PROJECT.firebasestorage.app",
-
-  messagingSenderId:
-    "YOUR_MESSAGING_SENDER_ID",
-
-  appId:
-    "YOUR_APP_ID"
+ apiKey: "AIzaSyAVy5nFd6sjyoVSYnnqRfXJpu29FstxFZc",
+  authDomain: "voice-chat01-63e85.firebaseapp.com",
+  databaseURL: "https://voice-chat01-63e85-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "voice-chat01-63e85",
+  storageBucket: "voice-chat01-63e85.firebasestorage.app",
+  messagingSenderId: "113293901393",
+  appId: "1:113293901393:web:bfbca6f5da36368e274270"
 
 };
 
