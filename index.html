@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
@@ -9,7 +10,10 @@
 
   <title>VoiceChat</title>
 
-  <link rel="stylesheet" href="style.css">
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
 </head>
 
 <body>
@@ -23,42 +27,47 @@
     <div class="auth-card">
 
       <div class="logo">
-        🎙️
+        📞
       </div>
 
       <h1>VoiceChat</h1>
 
       <p class="subtitle">
-        Connect with people using voice calls.
+        Connect with your friends by voice.
       </p>
 
-      <div id="loginForm">
+      <input
+        id="emailInput"
+        type="email"
+        placeholder="Email address"
+        autocomplete="email"
+      >
 
-        <input
-          id="emailInput"
-          type="email"
-          placeholder="Email"
-          autocomplete="email"
-        >
+      <input
+        id="passwordInput"
+        type="password"
+        placeholder="Password"
+        autocomplete="current-password"
+      >
 
-        <input
-          id="passwordInput"
-          type="password"
-          placeholder="Password"
-          autocomplete="current-password"
-        >
+      <button
+        id="loginBtn"
+        class="primary-btn"
+      >
+        Login
+      </button>
 
-        <button id="loginBtn" class="primary-btn">
-          Login
-        </button>
+      <button
+        id="registerBtn"
+        class="secondary-btn"
+      >
+        Create Account
+      </button>
 
-        <button id="registerBtn" class="secondary-btn">
-          Create Account
-        </button>
-
-        <p id="authMessage" class="message"></p>
-
-      </div>
+      <p
+        id="authMessage"
+        class="auth-message"
+      ></p>
 
     </div>
 
@@ -66,41 +75,72 @@
 
 
   <!-- =====================================================
-       APP
+       APP SCREEN
   ====================================================== -->
 
-  <section id="appScreen" class="screen hidden">
+  <section
+    id="appScreen"
+    class="screen hidden"
+  >
 
     <header class="topbar">
 
       <div>
-        <h2>🎙️ VoiceChat</h2>
-        <span id="currentUserText"></span>
+        <h1>📞 VoiceChat</h1>
+
+        <span
+          id="currentUserText"
+          class="current-user"
+        >
+          Loading...
+        </span>
       </div>
 
-      <button id="logoutBtn" class="small-btn">
-        Logout
-      </button>
+      <div class="topbar-actions">
+
+        <button
+          id="notificationBtn"
+          class="small-btn"
+        >
+          🔔 Enable Notifications
+        </button>
+
+        <button
+          id="logoutBtn"
+          class="logout-btn"
+        >
+          Logout
+        </button>
+
+      </div>
 
     </header>
 
 
-    <main class="app-content">
+    <main class="main-container">
 
-      <!-- USERS -->
+      <!-- =================================================
+           USERS
+      ================================================== -->
 
       <section class="panel">
 
         <div class="panel-header">
 
           <div>
-            <h3>People</h3>
-            <p>Choose someone to call.</p>
+            <h2>People</h2>
+
+            <p>
+              Select someone to start a voice call.
+            </p>
           </div>
 
         </div>
 
-        <div id="usersList" class="users-list">
+        <div
+          id="usersList"
+          class="users-list"
+        >
           <p class="empty">
             Loading users...
           </p>
@@ -109,24 +149,35 @@
       </section>
 
 
-      <!-- HISTORY -->
+      <!-- =================================================
+           CALL HISTORY
+      ================================================== -->
 
       <section class="panel">
 
         <div class="panel-header">
 
           <div>
-            <h3>Call History</h3>
-            <p>Your recent calls.</p>
+            <h2>Call History</h2>
+
+            <p>
+              Your recent calls.
+            </p>
           </div>
 
-          <button id="refreshHistoryBtn" class="small-btn">
-            Refresh
+          <button
+            id="refreshHistoryBtn"
+            class="small-btn"
+          >
+            🔄 Refresh
           </button>
 
         </div>
 
-        <div id="historyList" class="history-list">
+        <div
+          id="historyList"
+          class="history-list"
+        >
           <p class="empty">
             Loading history...
           </p>
@@ -140,61 +191,44 @@
 
 
   <!-- =====================================================
-       OUTGOING CALL
+       INCOMING CALL OVERLAY
   ====================================================== -->
 
-  <div id="outgoingOverlay" class="call-overlay hidden">
+  <div
+    id="incomingOverlay"
+    class="call-overlay hidden"
+  >
 
-    <div class="call-card">
+    <div class="call-card incoming-card">
 
-      <div class="call-avatar" id="outgoingAvatar">
-        👤
-      </div>
-
-      <h2 id="outgoingName">
-        Calling...
-      </h2>
-
-      <p id="outgoingStatus">
-        Calling...
-      </p>
-
-      <button id="cancelCallBtn" class="danger-btn">
-        Cancel Call
-      </button>
-
-    </div>
-
-  </div>
-
-
-  <!-- =====================================================
-       INCOMING CALL
-  ====================================================== -->
-
-  <div id="incomingOverlay" class="call-overlay hidden">
-
-    <div class="call-card">
-
-      <div class="call-avatar" id="incomingAvatar">
-        👤
+      <div
+        id="incomingAvatar"
+        class="large-avatar"
+      >
+        U
       </div>
 
       <h2 id="incomingName">
-        Incoming Call
+        User
       </h2>
 
-      <p>
-        Someone is calling you...
+      <p class="call-label">
+        Incoming voice call...
       </p>
 
       <div class="call-actions">
 
-        <button id="acceptCallBtn" class="accept-btn">
+        <button
+          id="acceptCallBtn"
+          class="accept-btn"
+        >
           📞 Accept
         </button>
 
-        <button id="rejectCallBtn" class="danger-btn">
+        <button
+          id="rejectCallBtn"
+          class="reject-btn"
+        >
           ❌ Reject
         </button>
 
@@ -206,41 +240,115 @@
 
 
   <!-- =====================================================
-       ACTIVE CALL
+       OUTGOING CALL OVERLAY
   ====================================================== -->
 
-  <div id="activeCallOverlay" class="call-overlay hidden">
+  <div
+    id="outgoingOverlay"
+    class="call-overlay hidden"
+  >
 
-    <div class="call-card active-call">
+    <div class="call-card">
 
-      <div class="call-avatar" id="activeAvatar">
-        👤
+      <div
+        id="outgoingAvatar"
+        class="large-avatar"
+      >
+        U
+      </div>
+
+      <h2 id="outgoingName">
+        User
+      </h2>
+
+      <p
+        id="outgoingStatus"
+        class="call-label"
+      >
+        Calling...
+      </p>
+
+      <div class="ring-animation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+
+      <button
+        id="cancelCallBtn"
+        class="end-btn"
+      >
+        📵 Cancel Call
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- =====================================================
+       ACTIVE CALL OVERLAY
+  ====================================================== -->
+
+  <div
+    id="activeCallOverlay"
+    class="call-overlay hidden"
+  >
+
+    <div class="call-card active-card">
+
+      <div
+        id="activeAvatar"
+        class="large-avatar"
+      >
+        U
       </div>
 
       <h2 id="activeName">
-        In Call
+        User
       </h2>
 
-      <p id="callStatus">
+      <p
+        id="callStatus"
+        class="call-label connected"
+      >
         Connected
       </p>
 
-      <div id="callTimer">
+      <div
+        id="callTimer"
+        class="call-timer"
+      >
         00:00
       </div>
 
-      <div class="call-controls">
+      <audio
+        id="remoteAudio"
+        autoplay
+        playsinline
+      ></audio>
 
-        <button id="muteBtn" class="control-btn">
+      <div class="active-controls">
+
+        <button
+          id="muteBtn"
+          class="control-btn"
+        >
           🎤 Mute
         </button>
 
-        <button id="speakerBtn" class="control-btn">
+        <button
+          id="speakerBtn"
+          class="control-btn"
+        >
           🔊 Speaker
         </button>
 
-        <button id="endCallBtn" class="danger-btn">
-          ☎️ End
+        <button
+          id="endCallBtn"
+          class="end-btn"
+        >
+          📵 End Call
         </button>
 
       </div>
@@ -251,21 +359,25 @@
 
 
   <!-- =====================================================
-       AUDIO
+       RINGTONE
   ====================================================== -->
 
   <audio
-    id="remoteAudio"
-    autoplay
-    playsinline
+    id="ringtone"
+    src="ringtone.mp3"
+    preload="auto"
+    loop
   ></audio>
 
 
   <!-- =====================================================
-       JAVASCRIPT
+       APP JAVASCRIPT
   ====================================================== -->
 
-  <script type="module" src="app.js"></script>
+  <script
+    type="module"
+    src="app.js"
+  ></script>
 
 </body>
 </html>
